@@ -1,0 +1,93 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+Title="玉子 · 小小的陪伴" Width="850" Height="770" MinWidth="780" MinHeight="740" ResizeMode="CanMinimize"
+WindowStartupLocation="CenterScreen" Background="#F8F6F1" FontFamily="Microsoft YaHei UI" Foreground="#49463F">
+<Window.Resources>
+<Style TargetType="Button">
+<Setter Property="Cursor" Value="Hand"/><Setter Property="FontSize" Value="13"/><Setter Property="Foreground" Value="#55544C"/>
+<Setter Property="Background" Value="#FFFFFF"/><Setter Property="BorderBrush" Value="#E8E5DC"/><Setter Property="Padding" Value="12,10"/>
+<Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+<Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="{TemplateBinding Padding}">
+<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+</Border><ControlTemplate.Triggers>
+<Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ButtonBorder" Property="Background" Value="#EEEFE5"/><Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#98A487"/></Trigger>
+<Trigger Property="IsPressed" Value="True"><Setter TargetName="ButtonBorder" Property="Opacity" Value="0.7"/></Trigger>
+<Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#788765"/></Trigger>
+</ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+<Style x:Key="ActionButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+<Setter Property="Margin" Value="0,0,9,9"/><Setter Property="Height" Value="63"/>
+</Style>
+</Window.Resources>
+<Grid Margin="30,24,30,20">
+<Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="22"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<Grid>
+<StackPanel><TextBlock Text="T A M A G O   /   D E S K T O P   P E T" FontSize="10" Foreground="#89917B"/>
+<StackPanel Orientation="Horizontal" Margin="0,8,0,0"><TextBlock Text="玉子的小小世界" FontSize="26" FontWeight="SemiBold"/><Border Background="#ECEFE4" CornerRadius="8" Margin="14,5,0,5" Padding="10,4"><TextBlock Text="会说话了 · v0.2" Foreground="#748263" FontSize="10"/></Border></StackPanel>
+<TextBlock Text="你忙你的，我会乖乖陪着你。" Margin="0,8,0,0" Foreground="#99938A" FontSize="12"/>
+</StackPanel>
+<Button x:Name="HidePanel" Content="收起面板 ↘" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,0,0" Padding="14,9" Background="#F8F6F1"/>
+</Grid>
+<Grid Grid.Row="2">
+<Grid.ColumnDefinitions><ColumnDefinition Width="280"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+<Border Background="#F0EDE5" CornerRadius="20" Padding="22">
+<Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<StackPanel><TextBlock Text="今天也在你身边" Foreground="#898A79" FontSize="11"/><TextBlock Text="小猫一只，陪伴满格。" FontSize="17" Margin="0,8,0,0"/></StackPanel>
+<Grid Grid.Row="1">
+<Ellipse Fill="#E2DED1" Width="166" Height="20" VerticalAlignment="Bottom" Margin="0,0,0,24"/>
+<Image x:Name="PreviewImage" Width="238" Height="238" Stretch="Uniform" VerticalAlignment="Bottom" RenderTransformOrigin=".5,.85"/>
+<Border x:Name="PreviewBubble" Background="#FFFDFA" BorderBrush="#E6DFD4" BorderThickness="1" CornerRadius="15" Padding="18,9" Width="222" VerticalAlignment="Top" Margin="0,10,0,0" Visibility="Collapsed" IsHitTestVisible="False">
+<TextBlock x:Name="PreviewSpeech" TextAlignment="Center" TextWrapping="Wrap" FontSize="13" LineHeight="20" Foreground="#807567"/>
+</Border>
+<TextBlock x:Name="PreviewZ" Text="z Z" FontSize="25" Foreground="#9A9E8A" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,40,6,0" Visibility="Collapsed"/>
+</Grid>
+<Border Grid.Row="2" HorizontalAlignment="Center" Background="#FFFDFA" CornerRadius="12" Padding="13,8" Margin="0,0,0,20">
+<TextBlock x:Name="StatusLabel" Text="● 静静陪着你" Foreground="#7B886B" FontSize="12"/>
+</Border>
+<StackPanel Grid.Row="3"><TextBlock Text="“小小的陪伴，" Foreground="#9B9488" FontSize="14" HorizontalAlignment="Center"/>
+<TextBlock Text="也是大大的力量。”" Foreground="#9B9488" FontSize="14" HorizontalAlignment="Center" Margin="0,4,0,18"/>
+<Border Height="1" Background="#DEDBD1" Margin="0,0,0,15"/>
+<TextBlock Text="拖动 · 把玉子放在喜欢的地方" Foreground="#989387" FontSize="10" HorizontalAlignment="Center"/>
+<TextBlock Text="单击摸摸  /  双击跳跃  /  右键菜单" Foreground="#989387" FontSize="10" HorizontalAlignment="Center" Margin="0,6,0,1"/></StackPanel>
+</Grid>
+</Border>
+<Grid Grid.Column="2">
+<Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+<Grid Margin="0,1,0,15"><TextBlock Text="让玉子动一动" FontSize="16" FontWeight="SemiBold"/><TextBlock x:Name="ModeLabel" Text="自由活动中" HorizontalAlignment="Right" Foreground="#97A184" FontSize="11" VerticalAlignment="Center"/></Grid>
+<UniformGrid Grid.Row="1" Columns="3" Rows="3" Margin="0,0,-9,0">
+<Button x:Name="ActionIdle" Style="{StaticResource ActionButton}"><StackPanel><TextBlock Text="◦" FontSize="18" HorizontalAlignment="Center" Foreground="#A7AB99"/><TextBlock Text="待机" HorizontalAlignment="Center"/></StackPanel></Button>
+<Button x:Name="ActionWalkLeft" Style="{StaticResource ActionButton}"><StackPanel><TextBlock Text="←" FontSize="18" HorizontalAlignment="Center" Foreground="#A7AB99"/><TextBlock Text="向左走" HorizontalAlignment="Center"/></StackPanel></Button>
+<Button x:Name="ActionWalkRight" Style="{StaticResource ActionButton}"><StackPanel><TextBlock Text="→" FontSize="18" HorizontalAlignment="Center" Foreground="#A7AB99"/><TextBlock Text="向右走" HorizontalAlignment="Center"/></StackPanel></Button>
+<Button x:Name="ActionRun" Style="{StaticResource ActionButton}"><StackPanel><TextBlock Text="»" FontSize="18" HorizontalAlignment="Center" Foreground="#A7AB99"/><TextBlock Text="跑步" HorizontalAlignment="Center"/></StackPanel></Button>
+<Button x:Name="ActionSit" Style="{StaticResource ActionButton}"><StackPanel><TextBlock Text="⌂" FontSize="18" HorizontalAlignment="Center" Foreground="#A7AB99"/><TextBlock Text="坐下" HorizontalAlignment="Center"/></StackPanel></Button>
+<Button x:Name="ActionLie" Style="{StaticResource ActionButton}"><StackPanel><TextBlock Text="⌒" FontSize="18" HorizontalAlignment="Center" Foreground="#A7AB99"/><TextBlock Text="趴下" HorizontalAlignment="Center"/></StackPanel></Button>
+<Button x:Name="ActionSleep" Style="{StaticResource ActionButton}"><StackPanel><TextBlock Text="☾" FontSize="18" HorizontalAlignment="Center" Foreground="#A7AB99"/><TextBlock Text="睡觉" HorizontalAlignment="Center"/></StackPanel></Button>
+<Button x:Name="ActionJump" Style="{StaticResource ActionButton}"><StackPanel><TextBlock Text="↑" FontSize="18" HorizontalAlignment="Center" Foreground="#A7AB99"/><TextBlock Text="跳跃" HorizontalAlignment="Center"/></StackPanel></Button>
+<Button x:Name="ActionAuto" Style="{StaticResource ActionButton}" Background="#EDF0E5"><StackPanel><TextBlock Text="∞" FontSize="18" HorizontalAlignment="Center" Foreground="#7B886B"/><TextBlock Text="自由活动" HorizontalAlignment="Center"/></StackPanel></Button>
+</UniformGrid>
+<Border Grid.Row="3" Background="#FFFFFF" CornerRadius="16" BorderBrush="#EBE8E0" BorderThickness="1" Padding="18,16">
+<StackPanel>
+<Grid><TextBlock Text="陪伴偏好" FontSize="13" FontWeight="SemiBold"/><CheckBox x:Name="KeepOnTop" Content="总在最上层" HorizontalAlignment="Right" VerticalContentAlignment="Center" Foreground="#8F8E81" FontSize="11"/></Grid>
+<Grid Margin="0,18,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="52"/><ColumnDefinition Width="*"/><ColumnDefinition Width="55"/></Grid.ColumnDefinitions>
+<TextBlock Text="体型" Foreground="#9A978D" FontSize="11" VerticalAlignment="Center"/><Slider x:Name="SizeSlider" Grid.Column="1" Minimum="110" Maximum="240" Value="170" VerticalAlignment="Center" ToolTip="调整猫咪大小"/>
+<TextBlock x:Name="SizeValue" Grid.Column="2" Text="170 px" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" Foreground="#9A978D"/>
+</Grid>
+<Grid Margin="0,15,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="52"/><ColumnDefinition Width="*"/><ColumnDefinition Width="55"/></Grid.ColumnDefinitions>
+<TextBlock Text="步速" Foreground="#9A978D" FontSize="11" VerticalAlignment="Center"/><Slider x:Name="SpeedSlider" Grid.Column="1" Minimum="25" Maximum="160" Value="72" VerticalAlignment="Center" ToolTip="调整散步与跑步速度"/>
+<TextBlock x:Name="SpeedValue" Grid.Column="2" Text="悠闲" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" Foreground="#9A978D"/>
+</Grid>
+<Border Height="1" Background="#EEEBE4" Margin="0,17,0,12"/>
+<Grid>
+<CheckBox x:Name="RandomSpeech" Content="随机聊聊天" VerticalAlignment="Center" VerticalContentAlignment="Center" FontSize="12" Foreground="#817E71"/>
+<Button x:Name="SpeakNow" Content="说一句 ♡" HorizontalAlignment="Right" Padding="12,6" Background="#F8F0EC" BorderBrush="#EBDDD4" Foreground="#AA8178" FontSize="11" ToolTip="立即随机说出参考图中的一句话"/>
+</Grid>
+<TextBlock x:Name="SpeechHint" Text="每 30–60 秒，送来一句小小的鼓励" FontSize="10" Foreground="#A09A8E" Margin="0,7,0,0"/>
+</StackPanel></Border>
+<Grid Grid.Row="4" VerticalAlignment="Bottom" Margin="0,16,0,0">
+<Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+<Button x:Name="FindPet" Content="⌖  找回玉子" Background="#818C70" Foreground="White" BorderBrush="#818C70" Padding="12,12"/>
+<Button x:Name="Quit" Grid.Column="2" Content="结束陪伴" Background="#F8F6F1" Padding="14,12" Foreground="#A29C90"/>
+</Grid>
+</Grid>
+</Grid>
+<Grid Grid.Row="3" Margin="0,20,0,0"><TextBlock Text="●  本地陪伴，无需联网" FontSize="10" Foreground="#9BA18C"/><TextBlock Text="慢慢来，你已经很棒了。" HorizontalAlignment="Right" FontSize="10" Foreground="#ADA69A"/></Grid>
+</Grid>
+</Window>
