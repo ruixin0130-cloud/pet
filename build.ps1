@@ -17,6 +17,7 @@ $petArgs = @(
     "/resource:$petProject\src\Panel.xaml,Panel.xaml",
     "/resource:$petProject\assets\tamago-sprites.png,tamago-sprites.png",
     "/resource:$petProject\assets\tamago-interactions.png,tamago-interactions.png",
+    "/resource:$petProject\assets\tamago-interaction-animations.png,tamago-interaction-animations.png",
     "/reference:$petWpf\PresentationCore.dll",
     "/reference:$petWpf\PresentationFramework.dll",
     "/reference:$petWpf\WindowsBase.dll",

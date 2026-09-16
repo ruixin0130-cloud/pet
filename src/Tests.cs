@@ -22,6 +22,28 @@ namespace Tamago {
             }
             state.Start(PetInteraction.PlayYarn);Check(state.Line.Contains("抓到"),"interaction includes a playful response");
             Check(InteractionState.LabelFor(PetInteraction.Wave)=="挥手打招呼","interaction label is localized");
+            int[] animatedRows={0,1,2};
+            PetInteraction[] animatedKinds={PetInteraction.Wave,PetInteraction.Petted,PetInteraction.PlayYarn};
+            for(int i=0;i<animatedKinds.Length;i++) {
+                state.Start(animatedKinds[i]);
+                Check(state.HasAnimation&&state.AnimationRow==animatedRows[i]&&state.AnimationFrame==0,"animated interaction starts on first frame "+animatedKinds[i]);
+                while(state.Elapsed<state.Duration*.5)state.Tick(.05,false);
+                Check(state.AnimationFrame==1,"animated interaction reaches middle frame "+animatedKinds[i]);
+            }
+            state.Start(PetInteraction.Curious);Check(!state.HasAnimation&&state.AnimationFrame==-1,"still interaction keeps its original frame");
+        }
+        static void TestGazeState() {
+            GazeState gaze=new GazeState();
+            gaze.Update(200,100,100,100,120,false);
+            Check(gaze.Active&&!gaze.FacingLeft&&gaze.Tilt>0&&gaze.Offset>0,"near cursor makes Tamago look right");
+            gaze.Update(20,100,100,100,120,false);
+            Check(gaze.Active&&gaze.FacingLeft&&gaze.Tilt<0&&gaze.Offset<0,"near cursor makes Tamago look left");
+            gaze.Update(400,100,100,100,120,false);
+            Check(!gaze.Active&&gaze.Tilt==0&&gaze.Offset==0,"distant cursor clears the gaze response");
+            gaze.Update(100,100,100,100,120,true);
+            Check(!gaze.Active,"dragging or an interaction suppresses the gaze response");
+            gaze.Update(double.NaN,100,100,100,120,false);
+            Check(!gaze.Active,"invalid cursor coordinates stay safe");
         }
         static bool IsAmbient(PetInteraction kind) {
             for(int i=0;i<InteractionState.AmbientKinds.Count;i++)
@@ -122,6 +144,7 @@ namespace Tamago {
                 TestDialogue();
                 TestInteractionState();
                 TestInteractionScheduler();
+                TestGazeState();
                 results.Add("SUCCESS "+results.Count+" checks passed");
                 File.WriteAllLines(Path.Combine(dir,"engine-tests.txt"),results.ToArray());return 0;
             } catch(Exception ex) {

@@ -15,8 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.4.0.0")]
-[assembly: AssemblyFileVersion("0.4.0.0")]
+[assembly: AssemblyVersion("0.5.0.0")]
+[assembly: AssemblyFileVersion("0.5.0.0")]
 
 namespace Tamago {
     static class Program {
@@ -66,7 +66,9 @@ namespace Tamago {
     }
     public sealed class InteractionBank {
         public readonly BitmapSource[] Frames=new BitmapSource[8];
+        public readonly BitmapSource[,] AnimationFrames=new BitmapSource[3,3];
         public readonly BitmapSource Atlas;
+        public readonly BitmapSource AnimationAtlas;
         public InteractionBank() {
             using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("tamago-interactions.png")) {
                 if(input==null)throw new FileNotFoundException("缺少互动动作素材，请重新运行 build.ps1。");
@@ -79,6 +81,17 @@ namespace Tamago {
                 CroppedBitmap crop=new CroppedBitmap(Atlas,new Int32Rect(x,y,right-x,bottom-y));
                 crop.Freeze(); Frames[row*4+col]=crop;
             }
+            using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("tamago-interaction-animations.png")) {
+                if(input==null)throw new FileNotFoundException("缺少互动动画素材，请重新运行 build.ps1。\n");
+                PngBitmapDecoder decoder=new PngBitmapDecoder(input,BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);
+                AnimationAtlas=decoder.Frames[0]; AnimationAtlas.Freeze();
+            }
+            for(int row=0;row<3;row++)for(int col=0;col<3;col++) {
+                int x=(int)Math.Floor(col*AnimationAtlas.PixelWidth/3.0), y=(int)Math.Floor(row*AnimationAtlas.PixelHeight/3.0);
+                int right=(int)Math.Floor((col+1)*AnimationAtlas.PixelWidth/3.0), bottom=(int)Math.Floor((row+1)*AnimationAtlas.PixelHeight/3.0);
+                CroppedBitmap crop=new CroppedBitmap(AnimationAtlas,new Int32Rect(x,y,right-x,bottom-y));
+                crop.Freeze(); AnimationFrames[row,col]=crop;
+            }
         }
     }
     public sealed class PetApp : Application {
@@ -87,6 +100,7 @@ namespace Tamago {
         readonly DialogueScheduler dialogue=new DialogueScheduler();
         readonly InteractionScheduler ambientInteractions=new InteractionScheduler();
         readonly InteractionState interaction=new InteractionState();
+        readonly GazeState gaze=new GazeState();
         readonly Stopwatch clock=Stopwatch.StartNew();
         double previousTime,bubbleStarted,bubbleUntil,petUntil,lastSave;
         bool bubbleIsRandom;
@@ -111,8 +125,10 @@ namespace Tamago {
         readonly Dictionary<PetInteraction,Button> interactionButtons=new Dictionary<PetInteraction,Button>();
         Button autoButton;
         ScaleTransform petScale=new ScaleTransform(1,1);
+        RotateTransform petTilt=new RotateTransform();
         TranslateTransform petShift=new TranslateTransform();
         ScaleTransform previewScale=new ScaleTransform(1,1);
+        RotateTransform previewTilt=new RotateTransform();
         TranslateTransform previewShift=new TranslateTransform();
         DispatcherTimer timer;
         Forms.NotifyIcon tray;
@@ -155,7 +171,7 @@ namespace Tamago {
             using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("Panel.xaml"))
                 panel=(Window)XamlReader.Load(input);
             previewImage=Find<Image>("PreviewImage");
-            TransformGroup pgroup=new TransformGroup(); pgroup.Children.Add(previewScale); pgroup.Children.Add(previewShift); previewImage.RenderTransform=pgroup;
+            TransformGroup pgroup=new TransformGroup(); pgroup.Children.Add(previewScale); pgroup.Children.Add(previewTilt); pgroup.Children.Add(previewShift); previewImage.RenderTransform=pgroup;
             status=Find<TextBlock>("StatusLabel"); mode=Find<TextBlock>("ModeLabel"); previewZ=Find<TextBlock>("PreviewZ");
             sizeValue=Find<TextBlock>("SizeValue"); speedValue=Find<TextBlock>("SpeedValue");
             sizeSlider=Find<Slider>("SizeSlider"); speedSlider=Find<Slider>("SpeedSlider"); topCheck=Find<CheckBox>("KeepOnTop");
@@ -213,7 +229,7 @@ namespace Tamago {
             canvas=new Canvas(); pet.Content=canvas;
             petImage=new Image { Width=engine.Size,Height=engine.Size,Stretch=Stretch.Uniform,Cursor=Cursors.Hand,RenderTransformOrigin=new Point(.5,.9) };
             RenderOptions.SetBitmapScalingMode(petImage,BitmapScalingMode.HighQuality);
-            TransformGroup transforms=new TransformGroup();transforms.Children.Add(petScale);transforms.Children.Add(petShift);petImage.RenderTransform=transforms;
+            TransformGroup transforms=new TransformGroup();transforms.Children.Add(petScale);transforms.Children.Add(petTilt);transforms.Children.Add(petShift);petImage.RenderTransform=transforms;
             canvas.Children.Add(petImage);
             bubbleText=new TextBlock { FontFamily=new FontFamily("Microsoft YaHei UI"),FontSize=13,LineHeight=20,Foreground=Brush("#777567"),TextAlignment=TextAlignment.Center,TextWrapping=TextWrapping.Wrap };
             bubble=new Border { Background=Brush("#FFFFFAF4"),BorderBrush=Brush("#E9E4D9"),BorderThickness=new Thickness(1),
@@ -339,6 +355,14 @@ namespace Tamago {
         bool IsMoving() {
             return engine.Action==PetAction.WalkLeft||engine.Action==PetAction.WalkRight||engine.Action==PetAction.Run;
         }
+        void UpdateGaze() {
+            Point cursor=CursorPosition();
+            double centerX=engine.X+engine.WindowWidth/2;
+            double centerY=engine.Y+100+engine.Size*.48;
+            double radius=Math.Max(120,engine.Size*1.18);
+            bool blocked=pressed||engine.Dragging||interaction.Active||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||IsMoving();
+            gaze.Update(cursor.X,cursor.Y,centerX,centerY,radius,blocked);
+        }
         void TriggerInteraction(PetInteraction kind,bool manual) {
             if(kind==PetInteraction.None)return;
             interactionResumePending=false;
@@ -401,7 +425,7 @@ namespace Tamago {
         }
         void AdvanceAmbientInteraction(double now) {
             bool busy=!engine.Automatic||engine.Dragging||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||
-                interaction.Active||now<bubbleUntil||now<petUntil||IsMoving();
+                interaction.Active||now<bubbleUntil||now<petUntil||IsMoving()||gaze.Active;
             PetInteraction next=ambientInteractions.TryNext(now,busy);
             if(next!=PetInteraction.None)TriggerInteraction(next,false);
         }
@@ -441,6 +465,7 @@ namespace Tamago {
             if(interactionWasActive&&!interaction.Active&&interactionResumePending&&engine.Action==PetAction.Idle) {
                 engine.SetAction(interactionResume,false);engine.FacingLeft=interactionResumeFacingLeft;interactionResumePending=false;
             }
+            UpdateGaze();
             AdvanceAmbientInteraction(now);
             AdvanceDialogue(now);ApplyLayout();Refresh();
             if(now-lastSave>4){Save();lastSave=now;}
@@ -449,24 +474,27 @@ namespace Tamago {
             double now=clock.Elapsed.TotalSeconds;
             bool moving=IsMoving();
             bool petted=now<petUntil;
+            bool looking=gaze.Active&&!interaction.Active;
             int frame=petted&&!moving&&engine.Action!=PetAction.Jump?2:engine.Frame;
             if(interaction.Active) {
-                petImage.Source=interactionSprites.Frames[interaction.Frame];
-                previewImage.Source=interactionSprites.Frames[interaction.Frame];
+                BitmapSource animation=interaction.HasAnimation?interactionSprites.AnimationFrames[interaction.AnimationRow,interaction.AnimationFrame]:interactionSprites.Frames[interaction.Frame];
+                petImage.Source=animation;previewImage.Source=animation;
             } else {
                 petImage.Source=sprites.Frames[frame];previewImage.Source=sprites.Frames[frame];
             }
             double breathing=1+Math.Sin(engine.Elapsed*(engine.Action==PetAction.Sleep?1.8:2.2))*.013;
-            petScale.ScaleX=previewScale.ScaleX=interaction.Active?1:(moving&&engine.FacingLeft?-1:1);
+            petScale.ScaleX=previewScale.ScaleX=interaction.Active?1:(looking?(gaze.FacingLeft?-1:1):(moving&&engine.FacingLeft?-1:1));
             petScale.ScaleY=previewScale.ScaleY=breathing;
+            petTilt.Angle=looking?gaze.Tilt:0;previewTilt.Angle=looking?gaze.Tilt*.55:0;
+            petShift.X=looking?gaze.Offset:0;previewShift.X=looking?gaze.Offset*.55:0;
             petShift.Y=-engine.Lift-interaction.Lift;previewShift.Y=-engine.Lift*.55-interaction.Lift*.55;
             RefreshSpeech(now);
             zzz.Visibility=previewZ.Visibility=engine.Action==PetAction.Sleep?Visibility.Visible:Visibility.Collapsed;
             zzz.Opacity=.55+Math.Sin(engine.Elapsed*2)*.3;
             heart.Visibility=petted?Visibility.Visible:Visibility.Collapsed;
             heart.Opacity=Math.Min(1,Math.Max(0,petUntil-now));
-            status.Text=interaction.Active?"● "+interaction.Label:"● "+engine.Label;
-            mode.Text=interaction.Active?"互动中":(engine.Automatic?"自由活动中":"听你的安排");
+            status.Text=interaction.Active?"● "+interaction.Label:(looking?"● 正在看着你":"● "+engine.Label);
+            mode.Text=interaction.Active?"互动中":(looking?"注意到你了":(engine.Automatic?"自由活动中":"听你的安排"));
             sizeValue.Text=((int)engine.Size)+" px";speedValue.Text=engine.Speed<55?"慢悠悠":engine.Speed>110?"轻快":"悠闲";
             foreach(KeyValuePair<PetAction,Button> item in actionButtons) {
                 bool selected=!engine.Automatic&&engine.Action==item.Key;
@@ -522,9 +550,15 @@ namespace Tamago {
                 checks.Add("PASS all 16 sprite frames decode");
                 foreach(BitmapSource frame in interactionSprites.Frames)if(frame.PixelWidth<1||frame.PixelHeight<1)throw new Exception("空互动动作帧");
                 checks.Add("PASS all 8 interaction frames decode");
+                for(int row=0;row<3;row++)for(int col=0;col<3;col++)
+                    if(interactionSprites.AnimationFrames[row,col].PixelWidth<1||interactionSprites.AnimationFrames[row,col].PixelHeight<1)
+                        throw new Exception("空互动动画帧");
+                checks.Add("PASS all 9 interaction animation frames decode");
                 engine.SetAction(PetAction.Idle,false);engine.Automatic=true;Refresh();ApplyLayout();
                 TestInteractionUi(checks);
                 CaptureInteractionSheet(Path.Combine(output,"interaction-preview.png"));
+                CaptureInteractionAnimationSheet(Path.Combine(output,"interaction-animation-preview.png"));
+                TestGazeUi(checks);
                 TestSpeechUi(checks);
                 CaptureDialogueSheet(Path.Combine(output,"dialogue-preview.png"));
                 engine.SetAction(PetAction.Idle,false);engine.Automatic=true;
@@ -566,6 +600,16 @@ namespace Tamago {
             if(interaction.Active)throw new Exception("移动时不应触发自主互动");
             interaction.Clear();checks.Add("PASS autonomous interaction dispatch and busy-state pause");
             checks.Add("PASS interaction wake-up, movement pause, and lifecycle");
+        }
+        void TestGazeUi(List<string> checks) {
+            interaction.Clear();engine.SetAction(PetAction.Idle,false);
+            gaze.Update(20,100,100,100,120,false);Refresh();
+            if(!gaze.Active||petScale.ScaleX>=0||petTilt.Angle>=0||petShift.X>=0)throw new Exception("鼠标靠近左侧时未看向左边");
+            gaze.Update(200,100,100,100,120,false);Refresh();
+            if(!gaze.Active||petScale.ScaleX<=0||petTilt.Angle<=0||petShift.X<=0)throw new Exception("鼠标靠近右侧时未看向右边");
+            gaze.Update(400,100,100,100,120,false);Refresh();
+            if(gaze.Active||petTilt.Angle!=0||petShift.X!=0)throw new Exception("鼠标离开后视线未复位");
+            checks.Add("PASS mouse proximity changes Tamago's direction and head tilt");
         }
         void StartLiveSpeechTest(List<string> checks,string output) {
             panel.Hide();engine.SetAction(PetAction.Sit,true);engine.Dragging=false;bubbleUntil=0;petUntil=0;
@@ -671,6 +715,19 @@ namespace Tamago {
                     dc.DrawImage(interactionSprites.Frames[i],new Rect(i%4*240,i/4*240,240,240));
             }
             RenderTargetBitmap bitmap=new RenderTargetBitmap(960,480,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);
+            PngBitmapEncoder encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using(FileStream stream=File.Create(path))encoder.Save(stream);
+        }
+        void CaptureInteractionAnimationSheet(string path) {
+            DrawingVisual visual=new DrawingVisual();
+            using(DrawingContext dc=visual.RenderOpen()) {
+                dc.DrawRectangle(Brush("#F4F1EA"),null,new Rect(0,0,720,720));
+                for(int row=0;row<3;row++) {
+                    for(int col=0;col<3;col++)
+                        dc.DrawImage(interactionSprites.AnimationFrames[row,col],new Rect(col*240,row*240,240,240));
+                }
+            }
+            RenderTargetBitmap bitmap=new RenderTargetBitmap(720,720,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);
             PngBitmapEncoder encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using(FileStream stream=File.Create(path))encoder.Save(stream);
         }

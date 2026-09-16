@@ -8,6 +8,8 @@ namespace Tamago {
 
     public sealed class InteractionState {
         static readonly double[] Durations={0,2.25,2.7,3.4,2.1,2.2,2.55,1.8,2.0};
+        // Wave, yarn, and petting each have a three-frame row in the v0.5 animation atlas.
+        static readonly int[] AnimationRows={-1,0,-1,2,1,-1,-1,-1,-1};
         static readonly ReadOnlyCollection<string> Labels=Array.AsReadOnly(new[] {
             "", "挥手打招呼", "发现了什么？", "玩毛线球", "被摸摸了", "开心满格", "有一点委屈", "吓了一跳", "兴奋起飞"
         });
@@ -26,6 +28,14 @@ namespace Tamago {
         public bool Active { get { return Kind!=PetInteraction.None; } }
         public double Duration { get { return Durations[(int)Kind]; } }
         public int Frame { get { return Active?(int)Kind-1:-1; } }
+        public bool HasAnimation { get { return Active&&AnimationRows[(int)Kind]>=0; } }
+        public int AnimationRow { get { return HasAnimation?AnimationRows[(int)Kind]:-1; } }
+        public int AnimationFrame {
+            get {
+                if(!HasAnimation)return -1;
+                return Math.Min(2,(int)(Elapsed/(Duration/3)));
+            }
+        }
         public string Label { get { return Labels[(int)Kind]; } }
         public string Line { get { return Lines[(int)Kind]; } }
         public static string LabelFor(PetInteraction kind) { return Labels[(int)kind]; }
@@ -48,6 +58,27 @@ namespace Tamago {
             Elapsed+=Math.Min(dt,.1);
             if(Elapsed>=Duration)Clear();
         }
+    }
+
+    /// <summary>Turns the global cursor position into a small, testable look-and-tilt response.</summary>
+    public sealed class GazeState {
+        public bool Active { get; private set; }
+        public bool FacingLeft { get; private set; }
+        public double Tilt { get; private set; }
+        public double Offset { get; private set; }
+        static bool Invalid(double value) { return double.IsNaN(value)||double.IsInfinity(value); }
+        public void Update(double cursorX,double cursorY,double centerX,double centerY,double radius,bool blocked) {
+            if(blocked||radius<=0||Invalid(cursorX)||Invalid(cursorY)||Invalid(centerX)||Invalid(centerY)||Invalid(radius)) {
+                Clear();return;
+            }
+            double dx=cursorX-centerX,dy=cursorY-centerY;
+            double distance=Math.Sqrt(dx*dx+dy*dy);
+            if(distance>radius){Clear();return;}
+            Active=true;FacingLeft=dx<0;
+            Tilt=Math.Max(-5.5,Math.Min(5.5,dx/radius*5.5));
+            Offset=Math.Max(-2,Math.Min(2,dx/radius*2));
+        }
+        public void Clear() { Active=false;FacingLeft=false;Tilt=0;Offset=0; }
     }
 
     /// <summary>
