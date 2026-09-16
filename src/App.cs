@@ -89,6 +89,8 @@ namespace Tamago {
         readonly Stopwatch clock=Stopwatch.StartNew();
         double previousTime,bubbleStarted,bubbleUntil,petUntil,lastSave;
         bool bubbleIsRandom;
+        PetAction interactionResume=PetAction.Idle;
+        bool interactionResumePending,interactionResumeFacingLeft;
         bool quitting,pressed,moved,suppressClick,initialized;
         Point dragStart,windowStart;
         SpriteBank sprites;
@@ -337,6 +339,10 @@ namespace Tamago {
         }
         void TriggerInteraction(PetInteraction kind,bool manual) {
             if(kind==PetInteraction.None)return;
+            interactionResumePending=false;
+            if(IsMoving()) {
+                interactionResume=engine.Action;interactionResumeFacingLeft=engine.FacingLeft;interactionResumePending=true;
+            }
             if(engine.Action==PetAction.Sleep)engine.SetAction(PetAction.Idle,manual);
             if(manual && (IsMoving()||engine.Action==PetAction.Jump))engine.SetAction(PetAction.Idle,true);
             if(kind==PetInteraction.Petted && IsMoving())engine.SetAction(PetAction.Idle,false);
@@ -347,6 +353,7 @@ namespace Tamago {
         }
         void ChangeAction(PetAction action) {
             interaction.Clear();
+            interactionResumePending=false;
             engine.SetAction(action,true);
             string[] lines={"我在这里陪你。","去左边看看～","去右边看看～","出发！","乖乖坐好。","趴一会儿，真舒服。","晚安，做个好梦。","嘿咻！"};
             Say(lines[(int)action],action==PetAction.Sleep?2:1.7);Refresh();Save();
@@ -409,7 +416,11 @@ namespace Tamago {
         void Tick(object sender,EventArgs args) {
             double now=clock.Elapsed.TotalSeconds,dt=now-previousTime;previousTime=now;
             engine.Tick(dt,WorkArea());
+            bool interactionWasActive=interaction.Active;
             interaction.Tick(dt,engine.Dragging||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump);
+            if(interactionWasActive&&!interaction.Active&&interactionResumePending&&engine.Action==PetAction.Idle) {
+                engine.SetAction(interactionResume,false);engine.FacingLeft=interactionResumeFacingLeft;interactionResumePending=false;
+            }
             AdvanceDialogue(now);ApplyLayout();Refresh();
             if(now-lastSave>4){Save();lastSave=now;}
         }
@@ -519,6 +530,9 @@ namespace Tamago {
             if(engine.Action==PetAction.Sleep||!interaction.Active)throw new Exception("被摸互动未唤醒睡觉状态");
             interaction.Clear();engine.SetAction(PetAction.WalkRight,true);TriggerInteraction(PetInteraction.Petted,false);
             if(engine.Action!=PetAction.Idle||!interaction.Active)throw new Exception("摸摸互动未暂停移动");
+            for(int i=0;i<30;i++)interaction.Tick(.1,false);
+            if(engine.Action!=PetAction.Idle)throw new Exception("互动单独计时不应修改基础动作");
+            interaction.Clear();interactionResumePending=true;interactionResume=PetAction.WalkRight;interactionResumeFacingLeft=false;
             interaction.Start(PetInteraction.Wave);double elapsed=interaction.Elapsed;interaction.Tick(.1,true);
             if(interaction.Elapsed!=elapsed)throw new Exception("互动在阻塞时继续播放");
             for(int i=0;i<50;i++)interaction.Tick(.1,false);
