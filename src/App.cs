@@ -15,8 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.3.0.0")]
-[assembly: AssemblyFileVersion("0.3.0.0")]
+[assembly: AssemblyVersion("0.4.0.0")]
+[assembly: AssemblyFileVersion("0.4.0.0")]
 
 namespace Tamago {
     static class Program {
@@ -85,6 +85,7 @@ namespace Tamago {
         readonly bool smoke;
         readonly PetEngine engine=new PetEngine();
         readonly DialogueScheduler dialogue=new DialogueScheduler();
+        readonly InteractionScheduler ambientInteractions=new InteractionScheduler();
         readonly InteractionState interaction=new InteractionState();
         readonly Stopwatch clock=Stopwatch.StartNew();
         double previousTime,bubbleStarted,bubbleUntil,petUntil,lastSave;
@@ -130,6 +131,7 @@ namespace Tamago {
             }
             engine.Size=saved.Size; engine.Speed=saved.Speed; engine.Automatic=saved.Automatic;
             dialogue.SetEnabled(saved.RandomSpeech,clock.Elapsed.TotalSeconds);
+            ambientInteractions.SetEnabled(engine.Automatic,clock.Elapsed.TotalSeconds);
             CreatePet(saved.Topmost); CreatePanel();
             MainWindow=panel;
             pet.Show();
@@ -176,7 +178,7 @@ namespace Tamago {
                 button.Click+=delegate { TriggerInteraction(captured,true); };
             }
             autoButton=Find<Button>("ActionAuto");
-            autoButton.Click+=delegate { engine.SetAutomatic(!engine.Automatic); Say(engine.Automatic?"那我自己玩一会儿～":"好，我乖乖待着。",2); if(!engine.Automatic)engine.SetAction(PetAction.Idle,false); Refresh(); Save(); };
+            autoButton.Click+=delegate { SetAutomaticMode(!engine.Automatic,true); };
             Find<Button>("HidePanel").Click+=delegate { panel.Hide(); };
             Find<Button>("FindPet").Click+=delegate { Home(); };
             Find<Button>("Quit").Click+=delegate { Quit(); };
@@ -252,7 +254,7 @@ namespace Tamago {
                 PetInteraction captured=i;
                 AddItem(menu,InteractionLabel(captured),delegate { TriggerInteraction(captured,true); });
             }
-            menu.Items.Add(new Separator());AddItem(menu,"自由活动",delegate {engine.SetAutomatic(true);Refresh();});
+            menu.Items.Add(new Separator());AddItem(menu,"自由活动",delegate {SetAutomaticMode(true,true);});
             AddItem(menu,"找回玉子",Home);AddItem(menu,"退出玉子",Quit);
             menu.Opened+=delegate { engine.Dragging=true; };
             menu.Closed+=delegate { engine.Dragging=false; };
@@ -347,8 +349,20 @@ namespace Tamago {
             if(manual && (IsMoving()||engine.Action==PetAction.Jump))engine.SetAction(PetAction.Idle,true);
             if(kind==PetInteraction.Petted && IsMoving())engine.SetAction(PetAction.Idle,false);
             interaction.Start(kind);
-            dialogue.Postpone(clock.Elapsed.TotalSeconds+interaction.Duration);
+            double now=clock.Elapsed.TotalSeconds;
+            dialogue.Postpone(now+interaction.Duration);
+            ambientInteractions.Postpone(now+interaction.Duration);
             if(manual)Say(interaction.Line,Math.Min(2.2,interaction.Duration));
+            Refresh();Save();
+        }
+        void SetAutomaticMode(bool enabled,bool announce) {
+            engine.SetAutomatic(enabled);
+            ambientInteractions.SetEnabled(enabled,clock.Elapsed.TotalSeconds);
+            if(!enabled) {
+                interaction.Clear();interactionResumePending=false;
+                engine.SetAction(PetAction.Idle,false);
+            }
+            if(announce)Say(enabled?"那我自己玩一会儿～":"好，我乖乖待着。",2);
             Refresh();Save();
         }
         void ChangeAction(PetAction action) {
@@ -384,6 +398,12 @@ namespace Tamago {
             bool busy=engine.Dragging||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||interaction.Active||now<bubbleUntil||now<petUntil;
             string line=dialogue.TryNext(now,busy);
             if(line!=null)SayAt(line,DialogueScheduler.DisplaySeconds,true,now);
+        }
+        void AdvanceAmbientInteraction(double now) {
+            bool busy=!engine.Automatic||engine.Dragging||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||
+                interaction.Active||now<bubbleUntil||now<petUntil||IsMoving();
+            PetInteraction next=ambientInteractions.TryNext(now,busy);
+            if(next!=PetInteraction.None)TriggerInteraction(next,false);
         }
         void Say(string text,double seconds) { SayAt(text,seconds,false,clock.Elapsed.TotalSeconds); }
         void SayAt(string text,double seconds,bool randomLine,double now) {
@@ -421,6 +441,7 @@ namespace Tamago {
             if(interactionWasActive&&!interaction.Active&&interactionResumePending&&engine.Action==PetAction.Idle) {
                 engine.SetAction(interactionResume,false);engine.FacingLeft=interactionResumeFacingLeft;interactionResumePending=false;
             }
+            AdvanceAmbientInteraction(now);
             AdvanceDialogue(now);ApplyLayout();Refresh();
             if(now-lastSave>4){Save();lastSave=now;}
         }
@@ -537,6 +558,13 @@ namespace Tamago {
             if(interaction.Elapsed!=elapsed)throw new Exception("互动在阻塞时继续播放");
             for(int i=0;i<50;i++)interaction.Tick(.1,false);
             if(interaction.Active)throw new Exception("互动结束后未回到基础动作");
+            engine.SetAutomatic(true);engine.SetAction(PetAction.Sit,false);ambientInteractions.SetEnabled(true,0);
+            double due=ambientInteractions.NextDue;AdvanceAmbientInteraction(due);
+            if(!interaction.Active||!InteractionState.AmbientKinds.Contains(interaction.Kind))throw new Exception("自由活动未触发自主互动");
+            interaction.Clear();ambientInteractions.SetEnabled(true,0);engine.SetAction(PetAction.WalkRight,false);
+            AdvanceAmbientInteraction(100);
+            if(interaction.Active)throw new Exception("移动时不应触发自主互动");
+            interaction.Clear();checks.Add("PASS autonomous interaction dispatch and busy-state pause");
             checks.Add("PASS interaction wake-up, movement pause, and lifecycle");
         }
         void StartLiveSpeechTest(List<string> checks,string output) {

@@ -23,6 +23,28 @@ namespace Tamago {
             state.Start(PetInteraction.PlayYarn);Check(state.Line.Contains("抓到"),"interaction includes a playful response");
             Check(InteractionState.LabelFor(PetInteraction.Wave)=="挥手打招呼","interaction label is localized");
         }
+        static bool IsAmbient(PetInteraction kind) {
+            for(int i=0;i<InteractionState.AmbientKinds.Count;i++)
+                if(InteractionState.AmbientKinds[i]==kind)return true;
+            return false;
+        }
+        static void TestInteractionScheduler() {
+            InteractionScheduler scheduler=new InteractionScheduler(new Random(17));
+            Check(scheduler.Enabled,"autonomous interactions start enabled");
+            Check(scheduler.NextDue>=12&&scheduler.NextDue<=22,"first autonomous gesture is scheduled after startup grace period");
+            double due=scheduler.NextDue;
+            Check(scheduler.TryNext(due-.01,false)==PetInteraction.None,"autonomous gestures wait until their due time");
+            PetInteraction first=scheduler.TryNext(due,false);
+            Check(IsAmbient(first)&&first!=PetInteraction.Petted,"autonomous gesture comes from the safe ambient set");
+            Check(scheduler.NextDue>=due+20&&scheduler.NextDue<=due+45,"autonomous gestures keep a relaxed interval");
+            double busyAt=scheduler.NextDue+1;
+            Check(scheduler.TryNext(busyAt,true)==PetInteraction.None&&scheduler.NextDue>=busyAt+7,"busy states postpone an autonomous gesture");
+            double next=scheduler.NextDue;
+            PetInteraction second=scheduler.TryNext(next,false);
+            Check(IsAmbient(second)&&second!=first,"adjacent autonomous gestures do not repeat");
+            scheduler.SetEnabled(false,100);Check(!scheduler.Enabled&&scheduler.TryNext(10000,false)==PetInteraction.None,"autonomous gestures stop when free activity is disabled");
+            scheduler.SetEnabled(true,200);Check(scheduler.TryNext(double.NaN,false)==PetInteraction.None&&scheduler.TryNext(double.PositiveInfinity,false)==PetInteraction.None,"invalid autonomous clock values stay quiet");
+        }
         static void TestDialogue() {
             DialogueScheduler d=new DialogueScheduler(new Random(123));
             Check(DialogueScheduler.Phrases.Count==6,"dialogue includes six reference phrases");
@@ -99,6 +121,7 @@ namespace Tamago {
                 s=PetSettings.Parse("this is not xml");Check(s.Size==170,"corrupt settings do not block startup");
                 TestDialogue();
                 TestInteractionState();
+                TestInteractionScheduler();
                 results.Add("SUCCESS "+results.Count+" checks passed");
                 File.WriteAllLines(Path.Combine(dir,"engine-tests.txt"),results.ToArray());return 0;
             } catch(Exception ex) {
