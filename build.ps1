@@ -25,7 +25,9 @@ $petArgs = @(
     '/reference:System.Windows.Forms.dll',
     '/reference:System.Drawing.dll',
     '/reference:System.Xml.Linq.dll',
+    '/reference:System.Web.Extensions.dll',
     "$petProject\src\PetEngine.cs",
+    "$petProject\src\PetProfile.cs",
     "$petProject\src\Interaction.cs",
     "$petProject\src\App.cs",
     "$petProject\src\Tests.cs",
@@ -34,4 +36,8 @@ $petArgs = @(
 & $petCompiler @petArgs
 if ($LASTEXITCODE -ne 0) { throw "Build failed (exit $LASTEXITCODE)." }
 Copy-Item -LiteralPath $petOutput -Destination (Join-Path $petProject ([string][char]0x7389+[char]0x5B50+[char]0x684C+[char]0x5BA0+'.exe')) -Force
+$petContentSource=Join-Path $petProject 'content\tamago-profile.json'
+$petBinContent=Join-Path $petBin 'content'
+New-Item -ItemType Directory -Force -Path $petBinContent | Out-Null
+Copy-Item -LiteralPath $petContentSource -Destination (Join-Path $petBinContent 'tamago-profile.json') -Force
 Write-Host "Built: $petOutput"

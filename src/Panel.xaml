@@ -24,8 +24,8 @@ WindowStartupLocation="CenterScreen" Background="#F8F6F1" FontFamily="Microsoft 
 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="22"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <Grid>
 <StackPanel><TextBlock Text="T A M A G O   /   D E S K T O P   P E T" FontSize="10" Foreground="#89917B"/>
-<StackPanel Orientation="Horizontal" Margin="0,8,0,0"><TextBlock Text="玉子的小小世界" FontSize="26" FontWeight="SemiBold"/><Border Background="#ECEFE4" CornerRadius="8" Margin="14,5,0,5" Padding="10,4"><TextBlock Text="会感应你了 · v0.6.0" Foreground="#748263" FontSize="10"/></Border></StackPanel>
-<TextBlock Text="你忙你的，我会乖乖陪着你。" Margin="0,8,0,0" Foreground="#99938A" FontSize="12"/>
+<StackPanel Orientation="Horizontal" Margin="0,8,0,0"><TextBlock x:Name="PanelTitle" Text="玉子的小小世界" FontSize="26" FontWeight="SemiBold"/><Border Background="#ECEFE4" CornerRadius="8" Margin="14,5,0,5" Padding="10,4"><TextBlock Text="内容可配置 · v0.7.0" Foreground="#748263" FontSize="10"/></Border></StackPanel>
+<TextBlock x:Name="PanelSubtitle" Text="你忙你的，我会乖乖陪着你。" Margin="0,8,0,0" Foreground="#99938A" FontSize="12"/>
 </StackPanel>
 <Button x:Name="HidePanel" Content="收起面板 ↘" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,0,0" Padding="14,9" Background="#F8F6F1"/>
 </Grid>

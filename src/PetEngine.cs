@@ -57,16 +57,17 @@ namespace Tamago {
             Elapsed+=dt; autoElapsed+=dt;
             automaticPause=Math.Max(0,automaticPause-dt);
             double energyRate=0;
-            if(Action==PetAction.Run)energyRate=-9;
-            else if(Action==PetAction.WalkLeft||Action==PetAction.WalkRight)energyRate=-3.2;
-            else if(Action==PetAction.Sleep)energyRate=11;
-            else if(Action==PetAction.Sit||Action==PetAction.Lie)energyRate=4.5;
-            else energyRate=-.35;
+            EnergyProfile energyProfile=PetProfile.Current.Energy;
+            if(Action==PetAction.Run)energyRate=-energyProfile.RunDrain;
+            else if(Action==PetAction.WalkLeft||Action==PetAction.WalkRight)energyRate=-energyProfile.WalkDrain;
+            else if(Action==PetAction.Sleep)energyRate=energyProfile.SleepRecover;
+            else if(Action==PetAction.Sit||Action==PetAction.Lie)energyRate=energyProfile.RestRecover;
+            else energyRate=-energyProfile.IdleDrain;
             Energy+=energyRate*dt;
             if(Action==PetAction.Jump && Elapsed>=0.85) SetAction(resume,false);
-            if(Automatic && automaticPause<=0 && Action!=PetAction.Jump && Action!=PetAction.Sleep && Energy<=24) {
+            if(Automatic && automaticPause<=0 && Action!=PetAction.Jump && Action!=PetAction.Sleep && Energy<=energyProfile.SleepAt) {
                 SetAction(PetAction.Sleep,false);nextAuto=28;
-            } else if(Automatic && automaticPause<=0 && Action==PetAction.Sleep && Energy>=82) {
+            } else if(Automatic && automaticPause<=0 && Action==PetAction.Sleep && Energy>=energyProfile.WakeAt) {
                 SetAction(PetAction.Idle,false);nextAuto=5;
             } else if(Automatic && automaticPause<=0 && autoElapsed>=nextAuto && Action!=PetAction.Jump && Action!=PetAction.Sleep) {
                 PetAction[] choices={PetAction.Idle,PetAction.WalkLeft,PetAction.WalkRight,PetAction.Sit,PetAction.Lie,PetAction.Sleep};
@@ -114,18 +115,7 @@ namespace Tamago {
             }
         }
         public string Label {
-            get {
-                switch(Action) {
-                    case PetAction.WalkLeft: return "向左散步";
-                    case PetAction.WalkRight: return "向右散步";
-                    case PetAction.Run: return "小跑一下";
-                    case PetAction.Sit: return "乖乖坐好";
-                    case PetAction.Lie: return "舒服地趴着";
-                    case PetAction.Sleep: return "正在做美梦";
-                    case PetAction.Jump: return "开心地跳跃";
-                    default: return "静静陪着你";
-                }
-            }
+            get { return PetProfile.Current.ActionLabel(Action); }
         }
     }
     public sealed class PetSettings {

@@ -15,8 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.6.0.0")]
-[assembly: AssemblyFileVersion("0.6.0.0")]
+[assembly: AssemblyVersion("0.7.0.0")]
+[assembly: AssemblyFileVersion("0.7.0.0")]
 
 namespace Tamago {
     static class Program {
@@ -97,7 +97,7 @@ namespace Tamago {
     public sealed class PetApp : Application {
         readonly bool smoke;
         readonly PetEngine engine=new PetEngine();
-        readonly DialogueScheduler dialogue=new DialogueScheduler();
+        DialogueScheduler dialogue;
         readonly InteractionScheduler ambientInteractions=new InteractionScheduler();
         readonly InteractionState interaction=new InteractionState();
         readonly GazeState gaze=new GazeState();
@@ -118,7 +118,7 @@ namespace Tamago {
         TranslateTransform bubbleShift=new TranslateTransform();
         TextBlock previewSpeech,speechHint;
         CheckBox speechCheck;
-        TextBlock bubbleText,zzz,heart,status,mode,sizeValue,speedValue,energyValue,previewZ;
+        TextBlock bubbleText,zzz,heart,status,mode,sizeValue,speedValue,energyValue,previewZ,panelTitle,panelSubtitle;
         Slider sizeSlider,speedSlider;
         ProgressBar energyBar;
         CheckBox topCheck;
@@ -136,9 +136,14 @@ namespace Tamago {
         bool lastTop=true;
         string lastSettings;
         string SettingsFile { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"TamagoPet","settings.xml"); } }
+        string ContentFile { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"content","tamago-profile.json"); } }
+        PetProfile profile=PetProfile.Current;
         public PetApp(bool isSmoke) { smoke=isSmoke; ShutdownMode=ShutdownMode.OnExplicitShutdown; }
         protected override void OnStartup(StartupEventArgs e) {
             base.OnStartup(e);
+            string profileError;
+            profile=PetProfile.Load(ContentFile,out profileError);PetProfile.Current=profile;
+            dialogue=new DialogueScheduler();
             sprites=new SpriteBank();
             interactionSprites=new InteractionBank();
             PetSettings saved=new PetSettings();
@@ -160,7 +165,7 @@ namespace Tamago {
             initialized=true;
             panel.Show();
             if(!smoke) CreateTray();
-            Say("你好呀，我是玉子。\n很高兴陪在你身边。",5);
+            Say(profile.Welcome,5);
             timer=new DispatcherTimer(DispatcherPriority.Render);
             timer.Interval=TimeSpan.FromMilliseconds(33); timer.Tick+=Tick;
             previousTime=clock.Elapsed.TotalSeconds; timer.Start();
@@ -171,6 +176,10 @@ namespace Tamago {
         void CreatePanel() {
             using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("Panel.xaml"))
                 panel=(Window)XamlReader.Load(input);
+            panelTitle=Find<TextBlock>("PanelTitle");panelSubtitle=Find<TextBlock>("PanelSubtitle");
+            panel.Title=profile.CharacterName+" · 小小的陪伴";
+            panelTitle.Text=profile.CharacterName+"的小小世界";
+            panelSubtitle.Text=profile.CharacterName+"会乖乖陪着你。";
             previewImage=Find<Image>("PreviewImage");
             TransformGroup pgroup=new TransformGroup(); pgroup.Children.Add(previewScale); pgroup.Children.Add(previewTilt); pgroup.Children.Add(previewShift); previewImage.RenderTransform=pgroup;
             status=Find<TextBlock>("StatusLabel"); mode=Find<TextBlock>("ModeLabel"); previewZ=Find<TextBlock>("PreviewZ");
@@ -282,7 +291,7 @@ namespace Tamago {
             MenuItem item=new MenuItem { Header=title };item.Click+=delegate {callback();};menu.Items.Add(item);
         }
         void CreateTray() {
-            tray=new Forms.NotifyIcon { Text="玉子 · 小小的陪伴",Visible=true };
+            tray=new Forms.NotifyIcon { Text=profile.CharacterName+" · 小小的陪伴",Visible=true };
             using(System.Drawing.Bitmap iconBitmap=new System.Drawing.Bitmap(32,32))
             using(System.Drawing.Graphics g=System.Drawing.Graphics.FromImage(iconBitmap)) {
                 g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
@@ -340,15 +349,8 @@ namespace Tamago {
             else interaction.Clear();
             engine.Constrain(WorkArea());ApplyLayout();Save();
         }
-        static string InteractionLabel(PetInteraction kind) {
-            switch(kind) {
-                case PetInteraction.Curious:return "好奇看看";
-                case PetInteraction.PlayYarn:return "玩毛线球";
-                case PetInteraction.Petted:return "被摸摸";
-                case PetInteraction.Pout:return "委屈";
-                case PetInteraction.Excited:return "兴奋";
-                default:return "互动";
-            }
+        string InteractionLabel(PetInteraction kind) {
+            return kind==PetInteraction.None?"互动":profile.Interaction(kind).Label;
         }
         bool IsMoving() {
             return engine.Action==PetAction.WalkLeft||engine.Action==PetAction.WalkRight||engine.Action==PetAction.Run;
@@ -379,8 +381,8 @@ namespace Tamago {
             interaction.Start(kind);
             double now=clock.Elapsed.TotalSeconds;
             if(kind==PetInteraction.Petted) {
-                companionUntil=Math.Max(companionUntil,now+8);
-                engine.HoldAutomatic(8);
+                companionUntil=Math.Max(companionUntil,now+profile.CompanionSeconds);
+                engine.HoldAutomatic(profile.CompanionSeconds);
             }
             dialogue.Postpone(now+interaction.Duration);
             ambientInteractions.Postpone(now+interaction.Duration);
@@ -575,7 +577,7 @@ namespace Tamago {
                 TestSpeechUi(checks);
                 CaptureDialogueSheet(Path.Combine(output,"dialogue-preview.png"));
                 engine.SetAction(PetAction.Idle,false);engine.Automatic=true;
-                SayAt(DialogueScheduler.Phrases[0],DialogueScheduler.DisplaySeconds,true,clock.Elapsed.TotalSeconds);
+                SayAt(dialogue.Phrases[0],DialogueScheduler.DisplaySeconds,true,clock.Elapsed.TotalSeconds);
                 Refresh();RefreshSpeech(bubbleStarted+.3);ApplyLayout();
                 panel.UpdateLayout();pet.UpdateLayout();
                 Capture(panel,Path.Combine(output,"panel-preview.png"));
@@ -634,7 +636,7 @@ namespace Tamago {
                 try {
                     double now=clock.Elapsed.TotalSeconds;
                     if(bubbleIsRandom&&bubbleStarted>=started&&bubbleHost.Opacity>.8) {
-                        if(!DialogueScheduler.Phrases.Contains(bubbleText.Text))throw new Exception("实际计时器未显示参考文案");
+                        if(!dialogue.Phrases.Contains(bubbleText.Text))throw new Exception("实际计时器未显示参考文案");
                         pet.UpdateLayout();Capture(pet,Path.Combine(output,"live-dialogue-preview.png"));
                         checks.Add("PASS real dispatcher shows a random phrase with panel hidden after "+(now-started).ToString("F1")+" seconds");
                         File.WriteAllLines(Path.Combine(output,"smoke-test.txt"),checks.ToArray());probe.Stop();Quit();
@@ -650,7 +652,7 @@ namespace Tamago {
             speechCheck.IsChecked=true;engine.SetAction(PetAction.Sit,true);
             dialogue.SetEnabled(true,0);bubbleUntil=0;
             AdvanceDialogue(20);RefreshSpeech(20.3);
-            if(!bubbleIsRandom||!DialogueScheduler.Phrases.Contains(bubbleText.Text)||bubbleHost.Visibility!=Visibility.Visible)
+            if(!bubbleIsRandom||!dialogue.Phrases.Contains(bubbleText.Text)||bubbleHost.Visibility!=Visibility.Visible)
                 throw new Exception("随机气泡未出现");
             checks.Add("PASS scheduled reference phrase appears independently of automatic movement");
 
@@ -676,7 +678,7 @@ namespace Tamago {
             if(dialogue.Enabled||bubbleHost.Visibility!=Visibility.Collapsed)throw new Exception("关闭随机聊天未生效");
             engine.SetAction(PetAction.Sleep,false);
             Find<Button>("SpeakNow").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            if(dialogue.Enabled||engine.Action==PetAction.Sleep||!DialogueScheduler.Phrases.Contains(bubbleText.Text))throw new Exception("手动说一句未生效");
+            if(dialogue.Enabled||engine.Action==PetAction.Sleep||!dialogue.Phrases.Contains(bubbleText.Text))throw new Exception("手动说一句未生效");
             double started=bubbleStarted;
             RefreshSpeech(started+.1);if(bubbleHost.Opacity<=0||bubbleHost.Opacity>=1)throw new Exception("气泡淡入异常");
             RefreshSpeech(started+5.7);if(bubbleHost.Opacity<=0||bubbleHost.Opacity>=1)throw new Exception("气泡淡出异常");
@@ -685,7 +687,7 @@ namespace Tamago {
             speechCheck.IsChecked=true;
             foreach(double size in new[]{110.0,170.0,240.0}) {
                 sizeSlider.Value=size;
-                foreach(string line in DialogueScheduler.Phrases) {
+                foreach(string line in dialogue.Phrases) {
                     SayAt(line,6,true,clock.Elapsed.TotalSeconds);RefreshSpeech(bubbleStarted+.3);ApplyLayout();pet.UpdateLayout();
                     if(bubbleHost.ActualWidth>pet.Width||Canvas.GetTop(bubbleHost)+bubbleHost.ActualHeight>100)
                         throw new Exception("气泡边界异常：width="+bubbleHost.ActualWidth+", window="+pet.Width+", top="+Canvas.GetTop(bubbleHost)+", height="+bubbleHost.ActualHeight+", desired="+bubbleHost.DesiredSize.Height);
@@ -700,9 +702,9 @@ namespace Tamago {
             DrawingVisual visual=new DrawingVisual();
             using(DrawingContext dc=visual.RenderOpen()) {
                 dc.DrawRectangle(Brush("#F4F1EA"),null,new Rect(0,0,780,600));
-                for(int i=0;i<DialogueScheduler.Phrases.Count;i++) {
+                for(int i=0;i<dialogue.Phrases.Count;i++) {
                     engine.Size=170;engine.SetAction(PetAction.Idle,false);
-                    SayAt(DialogueScheduler.Phrases[i],6,true,clock.Elapsed.TotalSeconds);
+                    SayAt(dialogue.Phrases[i],6,true,clock.Elapsed.TotalSeconds);
                     Refresh();RefreshSpeech(bubbleStarted+.3);ApplyLayout();pet.UpdateLayout();
                     RenderTargetBitmap shot=new RenderTargetBitmap((int)pet.Width,(int)pet.Height,96,96,PixelFormats.Pbgra32);
                     shot.Render(pet);

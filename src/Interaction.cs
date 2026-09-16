@@ -8,25 +8,15 @@ namespace Tamago {
     }
 
     public sealed class InteractionState {
-        static readonly double[] Durations={0,2.25,2.7,3.4,2.1,2.2,2.55,1.8,2.0};
         // Yarn and petting each have a three-frame row in the v0.5 animation atlas.
         static readonly int[] AnimationRows={-1,0,-1,2,1,-1,-1,-1,-1};
-        static readonly ReadOnlyCollection<string> Labels=Array.AsReadOnly(new[] {
-            "", "", "发现了什么？", "玩毛线球", "被摸摸了", "", "有一点委屈", "", "兴奋起飞"
-        });
-        static readonly ReadOnlyCollection<string> Lines=Array.AsReadOnly(new[] {
-            "", "", "咦？", "抓到啦！", "呼噜呼噜～", "", "再陪我一会儿嘛……", "", "嘿咻！"
-        });
         // These are the little gestures Tamago can decide to play on her own.
         // "Petted" stays user initiated because it represents a real mouse touch.
-        public static readonly ReadOnlyCollection<PetInteraction> AmbientKinds=Array.AsReadOnly(new[] {
-            PetInteraction.Curious, PetInteraction.PlayYarn,
-            PetInteraction.Pout, PetInteraction.Excited
-        });
+        public static ReadOnlyCollection<PetInteraction> AmbientKinds { get { return PetProfile.Current.AmbientInteractions; } }
         public PetInteraction Kind { get; private set; }
         public double Elapsed { get; private set; }
         public bool Active { get { return Kind!=PetInteraction.None; } }
-        public double Duration { get { return Durations[(int)Kind]; } }
+        public double Duration { get { return Active?PetProfile.Current.Interaction(Kind).Duration:0; } }
         public int Frame { get { return Active?(int)Kind-1:-1; } }
         public bool HasAnimation { get { return Active&&AnimationRows[(int)Kind]>=0; } }
         public int AnimationRow { get { return HasAnimation?AnimationRows[(int)Kind]:-1; } }
@@ -36,9 +26,9 @@ namespace Tamago {
                 return Math.Min(2,(int)(Elapsed/(Duration/3)));
             }
         }
-        public string Label { get { return Labels[(int)Kind]; } }
-        public string Line { get { return Lines[(int)Kind]; } }
-        public static string LabelFor(PetInteraction kind) { return Labels[(int)kind]; }
+        public string Label { get { return Active?PetProfile.Current.Interaction(Kind).Label:""; } }
+        public string Line { get { return Active?PetProfile.Current.Interaction(Kind).Line:""; } }
+        public static string LabelFor(PetInteraction kind) { return kind==PetInteraction.None?"":PetProfile.Current.Interaction(kind).Label; }
         public double Lift {
             get {
                 if(!Active)return 0;

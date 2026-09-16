@@ -69,9 +69,33 @@ namespace Tamago {
             scheduler.SetEnabled(false,100);Check(!scheduler.Enabled&&scheduler.TryNext(10000,false)==PetInteraction.None,"autonomous gestures stop when free activity is disabled");
             scheduler.SetEnabled(true,200);Check(scheduler.TryNext(double.NaN,false)==PetInteraction.None&&scheduler.TryNext(double.PositiveInfinity,false)==PetInteraction.None,"invalid autonomous clock values stay quiet");
         }
+        static void TestProfile() {
+            PetProfile original=PetProfile.Current;
+            try {
+                string profileError;
+                PetProfile packaged=PetProfile.Load(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"content","tamago-profile.json"),out profileError);
+                Check(profileError==null&&packaged.CharacterName=="玉子"&&packaged.DialoguePhrases.Count==6,"packaged profile loads beside the executable");
+                PetProfile custom=PetProfile.FromJson(@"{
+                    ""characterName"":""团子"",""welcome"":""今天也一起加油！"",""companionSeconds"":12,
+                    ""actionLabels"":{""Idle"":""守在身边""},
+                    ""dialogue"":[""一"",""二"",""三"",""四"",""五"",""六""],
+                    ""interactions"":{""Curious"":{""label"":""发现鼠标"",""line"":""看这里！"",""duration"":4.2,""ambient"":false},""Petted"":{""ambient"":true}},
+                    ""energy"":{""walkDrain"":4,""sleepAt"":20,""wakeAt"":85}
+                }");
+                PetProfile.Current=custom;
+                InteractionState state=new InteractionState();state.Start(PetInteraction.Curious);
+                Check(custom.CharacterName=="团子"&&custom.CompanionSeconds==12,"profile loads character settings");
+                Check(state.Label=="发现鼠标"&&state.Line=="看这里！"&&state.Duration==4.2,"profile overrides interaction copy and duration");
+                Check(!InteractionState.AmbientKinds.Contains(PetInteraction.Curious)&&!InteractionState.AmbientKinds.Contains(PetInteraction.Petted),"profile keeps touch-only interaction out of autonomous actions");
+                PetEngine engine=new PetEngine();Check(engine.Label=="守在身边"&&custom.Energy.WalkDrain==4,"profile overrides action and energy settings");
+                DialogueScheduler scheduler=new DialogueScheduler(new Random(2));Check(scheduler.Phrases.Count==6&&scheduler.SpeakNow(0)!=null,"profile supplies a complete dialogue set");
+                PetProfile fallback=PetProfile.FromJson(@"{""companionSeconds"":100,""dialogue"":[""only""],""energy"":{""sleepAt"":40,""wakeAt"":42}}");
+                Check(fallback.CompanionSeconds==8&&fallback.DialoguePhrases.Count==6&&fallback.Energy.WakeAt==82,"invalid profile values fall back safely");
+            } finally { PetProfile.Current=original; }
+        }
         static void TestDialogue() {
             DialogueScheduler d=new DialogueScheduler(new Random(123));
-            Check(DialogueScheduler.Phrases.Count==6,"dialogue includes six reference phrases");
+            Check(d.Phrases.Count==6,"dialogue includes six reference phrases");
             Check(d.NextDue>=8&&d.NextDue<=12,"first spontaneous phrase is scheduled shortly after startup");
             double due=d.NextDue;
             Check(d.TryNext(due-.01,false)==null,"dialogue does not speak before its scheduled time");
@@ -156,6 +180,7 @@ namespace Tamago {
                 s=PetSettings.Parse("<tamago size='NaN' speed='Infinity' x='Infinity' y='oops'/>");
                 Check(s.Size==170&&s.Speed==72&&double.IsNaN(s.X)&&double.IsNaN(s.Y),"invalid settings fall back safely");
                 s=PetSettings.Parse("this is not xml");Check(s.Size==170,"corrupt settings do not block startup");
+                TestProfile();
                 TestDialogue();
                 TestInteractionState();
                 TestInteractionScheduler();

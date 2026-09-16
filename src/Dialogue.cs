@@ -2,28 +2,24 @@ using System;
 using System.Collections.ObjectModel;
 
 namespace Tamago {
-    // Scheduling uses the app's monotonic clock. Six reference phrases are shuffled
+    // Scheduling uses the app's monotonic clock. Configured phrases are shuffled
     // without replacement, including protection against repeats between two rounds.
     public sealed class DialogueScheduler {
         public const double DisplaySeconds=6;
-        public static readonly ReadOnlyCollection<string> Phrases=Array.AsReadOnly(new[] {
-            "加油！\n你可以的！",
-            "要休息一下吗？\n(・ω・)",
-            "写得真棒！",
-            "又是高效的一天！\n(｡・ω・｡)",
-            "累了就放空吧～",
-            "有什么我可以\n帮你的吗？"
-        });
+        readonly ReadOnlyCollection<string> phrases;
         readonly Random random;
-        readonly int[] bag=new int[Phrases.Count];
+        readonly int[] bag;
         int cursor,previous=-1;
         double nextDue;
+        public ReadOnlyCollection<string> Phrases { get { return phrases; } }
         public bool Enabled { get; private set; }
         public double NextDue { get { return nextDue; } }
         public DialogueScheduler() : this(new Random()) {}
-        public DialogueScheduler(Random generator) {
+        public DialogueScheduler(Random generator) : this(generator,PetProfile.Current.DialoguePhrases) {}
+        public DialogueScheduler(Random generator,ReadOnlyCollection<string> configuredPhrases) {
             if(generator==null)throw new ArgumentNullException("generator");
-            random=generator;cursor=bag.Length;SetEnabled(true,0);
+            if(configuredPhrases==null||configuredPhrases.Count<2)throw new ArgumentException("configuredPhrases");
+            random=generator;phrases=configuredPhrases;bag=new int[phrases.Count];cursor=bag.Length;SetEnabled(true,0);
         }
         public void SetEnabled(bool value,double now) {
             Enabled=value;nextDue=now+8+random.NextDouble()*4;
@@ -48,7 +44,7 @@ namespace Tamago {
             }
             previous=bag[cursor++];
             nextDue=now+30+random.NextDouble()*30;
-            return Phrases[previous];
+            return phrases[previous];
         }
     }
 }
