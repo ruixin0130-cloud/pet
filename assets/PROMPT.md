@@ -8,7 +8,7 @@ Use case: stylized-concept. Asset type: production sprite atlas for a Windows de
 
 ## 第三版互动素材
 
-使用内置 imagegen，以 `tamago-sprites.png` 作为角色与画风参考生成 4×2 透明互动动作图。八个单元格依次为：挥手、好奇、玩毛线球、被摸、开心、委屈、惊讶、兴奋。素材要求保留灰白猫咪、粉色耳朵、脸部白斑、暖灰铅笔线和柔和水彩质感，同时保留参考图里的小问号、感叹号、爱心、毛线球、手掌等轻量装饰。
+使用内置 imagegen，以 `tamago-sprites.png` 作为角色与画风参考生成 4×2 透明互动动作图。程序当前注册的互动动作是：好奇、玩毛线球、被摸、委屈、兴奋；图集中其余历史姿势仅作为素材存档，不会被界面或状态机触发。素材要求保留灰白猫咪、粉色耳朵、脸部白斑、暖灰铅笔线和柔和水彩质感，同时保留参考图里的小问号、毛线球、手掌等轻量装饰。
 
 ```text
 Use case: stylized-concept. Asset type: transparent interaction sprite atlas for the same Windows desktop pet. Image 1 is the existing character and art style reference; preserve this exact fluffy gray-and-white kitten identity, proportions, warm pencil outline, soft watercolor shading, pink inner ears, blush, huge shiny dark brown eyes, white face blaze and chest, gray cap and fluffy tail. Generate a 2048x1024 image with genuinely transparent alpha, no checkerboard and no white background, exactly 4 columns x 2 rows, 8 equal invisible cells. No grid lines, no text, no labels, no watermark, no floor, no drop shadow. One complete cat per cell with generous transparent padding, same scale and baseline. Interaction sheet cell order left to right, top row: waving hello; curious with a small question mark; playing with a small pale pink yarn ball; being petted by one simple light skin-tone hand. Bottom row: happy with tiny pink hearts; pouty or wronged; surprised with a tiny exclamation mark; excited with one tiny pink sparkle. Keep all cell content fully inside its cell and preserve transparency.
@@ -16,16 +16,8 @@ Use case: stylized-concept. Asset type: transparent interaction sprite atlas for
 
 ## 第五版连续互动素材
 
-使用内置 imagegen，以 `tamago-interactions.png` 为画风和角色参考生成 `tamago-interaction-animations.png`。这是一张 3×3 透明图集：第一行是挥手的准备、抬爪和收回；第二行是摸头的靠近、轻抚和开心收尾；第三行是看毛线球、伸爪和拨球。
+使用内置 imagegen，以 `tamago-interactions.png` 为画风和角色参考生成 `tamago-interaction-animations.png`。这是一张 3×3 透明图集：第二行是摸头的靠近、轻抚和收尾；第三行是看毛线球、伸爪和拨球。第一行是历史素材，当前版本不会渲染或触发。
 
 ```text
-Use case: illustration-story. Asset type: transparent PNG sprite atlas for a Windows desktop pet. Input image: the existing interaction atlas is a style and character reference only. Create one precise 3 columns by 3 rows animation atlas with nine evenly sized cells. Use the same fluffy grey-and-white kitten in every cell: round body, white face blaze and chest, brown eyes, pink ears and cheeks, soft hand-drawn pastel watercolor linework. Row 1, left to right: paw down preparing to wave; paw raised at the peak; paw returning with two subtle pink motion lines. Row 2: a gentle human hand approaches above the head; hand softly strokes the head while the kitten closes eyes happily; hand lifts away while the kitten keeps a delighted expression with one tiny pink heart. Row 3: kitten watches a small pink yarn ball; reaches one paw toward it; taps it so the ball rolls slightly with one short curved motion line. Exactly nine equal cells in a uniform 3×3 grid; each cell has a full kitten centered with consistent scale and transparent padding. Fully transparent background, no shadows, no ground, no checkerboard, no labels, no numbers, no borders, no grid lines, no logo, no watermark, no extra characters.
-```
-
-## v0.5.1 挥手肢体修复
-
-原挥手的抬爪帧含有重复的落地前爪，因此新增 `tamago-wave-animation.png` 并由程序优先使用。图集为一行三帧：静止、抬爪、收回；抬爪帧严格只有一只抬起的前爪和一只落地的前爪。
-
-```text
-Use case: precise-object-edit. Asset type: transparent three-frame waving kitten animation. The exact character and watercolor style are preserved. Cell 1 has both front paws on the ground. In cells 2 and 3 there are exactly TWO visible front paws: one raised or lowering paw on the viewer's left and one grounded paw on the viewer's right. Remove the duplicate grounded paw under the raised limb and leave blank space there. Every kitten has exactly four paws total. No extra legs, floating paws, duplicate limbs, props, text, borders, grid, shadow, or watermark. Keep alpha transparency.
+Use case: illustration-story. Asset type: transparent PNG sprite atlas for a Windows desktop pet. Input image: the existing interaction atlas is a style and character reference only. Create one precise 3 columns by 3 rows animation atlas with nine evenly sized cells. Use the same fluffy grey-and-white kitten in every cell: round body, white face blaze and chest, brown eyes, pink ears and cheeks, soft hand-drawn pastel watercolor linework. Row 1 is reserved legacy material and is not rendered. Row 2: a gentle human hand approaches above the head; hand softly strokes the head while the kitten closes eyes; hand lifts away while the kitten keeps a content expression. Row 3: kitten watches a small pink yarn ball; reaches one paw toward it; taps it so the ball rolls slightly with one short curved motion line. Exactly nine equal cells in a uniform 3×3 grid; each cell has a full kitten centered with consistent scale and transparent padding. Fully transparent background, no shadows, no ground, no checkerboard, no labels, no numbers, no borders, no grid lines, no logo, no watermark, no extra characters.
 ```

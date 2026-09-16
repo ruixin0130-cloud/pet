@@ -21,9 +21,9 @@ namespace Tamago {
                 state.Clear();
             }
             state.Start(PetInteraction.PlayYarn);Check(state.Line.Contains("抓到"),"interaction includes a playful response");
-            Check(InteractionState.LabelFor(PetInteraction.Wave)=="挥手打招呼","interaction label is localized");
-            int[] animatedRows={0,1,2};
-            PetInteraction[] animatedKinds={PetInteraction.Wave,PetInteraction.Petted,PetInteraction.PlayYarn};
+            Check(InteractionState.LabelFor(PetInteraction.Petted)=="被摸摸了","interaction label is localized");
+            int[] animatedRows={1,2};
+            PetInteraction[] animatedKinds={PetInteraction.Petted,PetInteraction.PlayYarn};
             for(int i=0;i<animatedKinds.Length;i++) {
                 state.Start(animatedKinds[i]);
                 Check(state.HasAnimation&&state.AnimationRow==animatedRows[i]&&state.AnimationFrame==0,"animated interaction starts on first frame "+animatedKinds[i]);
@@ -52,6 +52,8 @@ namespace Tamago {
         }
         static void TestInteractionScheduler() {
             InteractionScheduler scheduler=new InteractionScheduler(new Random(17));
+            Check(Enum.GetValues(typeof(PetInteraction)).Length==6&&InteractionState.AmbientKinds.Count==4,
+                "removed interactions are absent from the enum and autonomous candidates");
             Check(scheduler.Enabled,"autonomous interactions start enabled");
             Check(scheduler.NextDue>=12&&scheduler.NextDue<=22,"first autonomous gesture is scheduled after startup grace period");
             double due=scheduler.NextDue;

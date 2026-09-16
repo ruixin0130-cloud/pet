@@ -3,25 +3,25 @@ using System.Collections.ObjectModel;
 
 namespace Tamago {
     public enum PetInteraction {
-        None=0, Wave, Curious, PlayYarn, Petted, Happy, Pout, Surprised, Excited
+        // Keep the historical numeric slots so saved state and sprite indexes remain compatible.
+        None=0, Curious=2, PlayYarn=3, Petted=4, Pout=6, Excited=8
     }
 
     public sealed class InteractionState {
         static readonly double[] Durations={0,2.25,2.7,3.4,2.1,2.2,2.55,1.8,2.0};
-        // Wave, yarn, and petting each have a three-frame row in the v0.5 animation atlas.
+        // Yarn and petting each have a three-frame row in the v0.5 animation atlas.
         static readonly int[] AnimationRows={-1,0,-1,2,1,-1,-1,-1,-1};
         static readonly ReadOnlyCollection<string> Labels=Array.AsReadOnly(new[] {
-            "", "挥手打招呼", "发现了什么？", "玩毛线球", "被摸摸了", "开心满格", "有一点委屈", "吓了一跳", "兴奋起飞"
+            "", "", "发现了什么？", "玩毛线球", "被摸摸了", "", "有一点委屈", "", "兴奋起飞"
         });
         static readonly ReadOnlyCollection<string> Lines=Array.AsReadOnly(new[] {
-            "", "嗨～", "咦？", "抓到啦！", "呼噜呼噜～", "好开心呀！", "再陪我一会儿嘛……", "啊！", "嘿咻！"
+            "", "", "咦？", "抓到啦！", "呼噜呼噜～", "", "再陪我一会儿嘛……", "", "嘿咻！"
         });
         // These are the little gestures Tamago can decide to play on her own.
         // "Petted" stays user initiated because it represents a real mouse touch.
         public static readonly ReadOnlyCollection<PetInteraction> AmbientKinds=Array.AsReadOnly(new[] {
-            PetInteraction.Wave, PetInteraction.Curious, PetInteraction.PlayYarn,
-            PetInteraction.Happy, PetInteraction.Pout, PetInteraction.Surprised,
-            PetInteraction.Excited
+            PetInteraction.Curious, PetInteraction.PlayYarn,
+            PetInteraction.Pout, PetInteraction.Excited
         });
         public PetInteraction Kind { get; private set; }
         public double Elapsed { get; private set; }
@@ -43,8 +43,7 @@ namespace Tamago {
             get {
                 if(!Active)return 0;
                 double progress=Math.Min(1,Elapsed/Duration);
-                if(Kind==PetInteraction.Excited||Kind==PetInteraction.Happy)return Math.Sin(progress*Math.PI)*8;
-                if(Kind==PetInteraction.Wave)return Math.Sin(progress*Math.PI)*3;
+                if(Kind==PetInteraction.Excited)return Math.Sin(progress*Math.PI)*8;
                 return 0;
             }
         }

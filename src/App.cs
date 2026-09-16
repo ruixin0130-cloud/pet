@@ -15,8 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.5.1.0")]
-[assembly: AssemblyFileVersion("0.5.1.0")]
+[assembly: AssemblyVersion("0.5.2.0")]
+[assembly: AssemblyFileVersion("0.5.2.0")]
 
 namespace Tamago {
     static class Program {
@@ -67,10 +67,8 @@ namespace Tamago {
     public sealed class InteractionBank {
         public readonly BitmapSource[] Frames=new BitmapSource[8];
         public readonly BitmapSource[,] AnimationFrames=new BitmapSource[3,3];
-        public readonly BitmapSource[] WaveAnimationFrames=new BitmapSource[3];
         public readonly BitmapSource Atlas;
         public readonly BitmapSource AnimationAtlas;
-        public readonly BitmapSource WaveAnimationAtlas;
         public InteractionBank() {
             using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("tamago-interactions.png")) {
                 if(input==null)throw new FileNotFoundException("缺少互动动作素材，请重新运行 build.ps1。");
@@ -93,17 +91,6 @@ namespace Tamago {
                 int right=(int)Math.Floor((col+1)*AnimationAtlas.PixelWidth/3.0), bottom=(int)Math.Floor((row+1)*AnimationAtlas.PixelHeight/3.0);
                 CroppedBitmap crop=new CroppedBitmap(AnimationAtlas,new Int32Rect(x,y,right-x,bottom-y));
                 crop.Freeze(); AnimationFrames[row,col]=crop;
-            }
-            using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("tamago-wave-animation.png")) {
-                if(input==null)throw new FileNotFoundException("缺少挥手动画素材，请重新运行 build.ps1。");
-                PngBitmapDecoder decoder=new PngBitmapDecoder(input,BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);
-                WaveAnimationAtlas=decoder.Frames[0]; WaveAnimationAtlas.Freeze();
-            }
-            for(int col=0;col<3;col++) {
-                int x=(int)Math.Floor(col*WaveAnimationAtlas.PixelWidth/3.0);
-                int right=(int)Math.Floor((col+1)*WaveAnimationAtlas.PixelWidth/3.0);
-                CroppedBitmap crop=new CroppedBitmap(WaveAnimationAtlas,new Int32Rect(x,0,right-x,WaveAnimationAtlas.PixelHeight));
-                crop.Freeze(); WaveAnimationFrames[col]=crop;
             }
         }
     }
@@ -308,7 +295,7 @@ namespace Tamago {
             Forms.ContextMenuStrip menu=new Forms.ContextMenuStrip();
             menu.Items.Add("打开动作面板",null,delegate {Dispatcher.Invoke(new Action(ShowPanel));});
             menu.Items.Add("玉子，说一句",null,delegate {Dispatcher.Invoke(new Action(SpeakNow));});
-            menu.Items.Add("互动动作",null,delegate {Dispatcher.Invoke(new Action(delegate { TriggerInteraction(PetInteraction.Wave,true); }));});
+            menu.Items.Add("互动动作",null,delegate {Dispatcher.Invoke(new Action(delegate { TriggerInteraction(PetInteraction.Petted,true); }));});
             menu.Items.Add("找回玉子",null,delegate {Dispatcher.Invoke(new Action(Home));});
             menu.Items.Add("退出玉子",null,delegate {Dispatcher.Invoke(new Action(Quit));});
             tray.ContextMenuStrip=menu;
@@ -354,13 +341,10 @@ namespace Tamago {
         }
         static string InteractionLabel(PetInteraction kind) {
             switch(kind) {
-                case PetInteraction.Wave:return "挥手打招呼";
                 case PetInteraction.Curious:return "好奇看看";
                 case PetInteraction.PlayYarn:return "玩毛线球";
                 case PetInteraction.Petted:return "被摸摸";
-                case PetInteraction.Happy:return "开心";
                 case PetInteraction.Pout:return "委屈";
-                case PetInteraction.Surprised:return "惊讶";
                 case PetInteraction.Excited:return "兴奋";
                 default:return "互动";
             }
@@ -490,8 +474,7 @@ namespace Tamago {
             bool looking=gaze.Active&&!interaction.Active;
             int frame=petted&&!moving&&engine.Action!=PetAction.Jump?2:engine.Frame;
             if(interaction.Active) {
-                BitmapSource animation=interaction.Kind==PetInteraction.Wave?interactionSprites.WaveAnimationFrames[interaction.AnimationFrame]:
-                    (interaction.HasAnimation?interactionSprites.AnimationFrames[interaction.AnimationRow,interaction.AnimationFrame]:interactionSprites.Frames[interaction.Frame]);
+                BitmapSource animation=interaction.HasAnimation?interactionSprites.AnimationFrames[interaction.AnimationRow,interaction.AnimationFrame]:interactionSprites.Frames[interaction.Frame];
                 petImage.Source=animation;previewImage.Source=animation;
             } else {
                 petImage.Source=sprites.Frames[frame];previewImage.Source=sprites.Frames[frame];
@@ -564,13 +547,10 @@ namespace Tamago {
                 checks.Add("PASS all 16 sprite frames decode");
                 foreach(BitmapSource frame in interactionSprites.Frames)if(frame.PixelWidth<1||frame.PixelHeight<1)throw new Exception("空互动动作帧");
                 checks.Add("PASS all 8 interaction frames decode");
-                for(int row=0;row<3;row++)for(int col=0;col<3;col++)
+                for(int row=1;row<3;row++)for(int col=0;col<3;col++)
                     if(interactionSprites.AnimationFrames[row,col].PixelWidth<1||interactionSprites.AnimationFrames[row,col].PixelHeight<1)
                         throw new Exception("空互动动画帧");
-                checks.Add("PASS all 9 interaction animation frames decode");
-                foreach(BitmapSource frame in interactionSprites.WaveAnimationFrames)
-                    if(frame.PixelWidth<1||frame.PixelHeight<1)throw new Exception("空挥手修复动画帧");
-                checks.Add("PASS all 3 corrected wave animation frames decode");
+                checks.Add("PASS all 6 active interaction animation frames decode");
                 engine.SetAction(PetAction.Idle,false);engine.Automatic=true;Refresh();ApplyLayout();
                 TestInteractionUi(checks);
                 CaptureInteractionSheet(Path.Combine(output,"interaction-preview.png"));
@@ -605,7 +585,7 @@ namespace Tamago {
             for(int i=0;i<30;i++)interaction.Tick(.1,false);
             if(engine.Action!=PetAction.Idle)throw new Exception("互动单独计时不应修改基础动作");
             interaction.Clear();interactionResumePending=true;interactionResume=PetAction.WalkRight;interactionResumeFacingLeft=false;
-            interaction.Start(PetInteraction.Wave);double elapsed=interaction.Elapsed;interaction.Tick(.1,true);
+            interaction.Start(PetInteraction.Curious);double elapsed=interaction.Elapsed;interaction.Tick(.1,true);
             if(interaction.Elapsed!=elapsed)throw new Exception("互动在阻塞时继续播放");
             for(int i=0;i<50;i++)interaction.Tick(.1,false);
             if(interaction.Active)throw new Exception("互动结束后未回到基础动作");
@@ -727,26 +707,27 @@ namespace Tamago {
         void CaptureInteractionSheet(string path) {
             DrawingVisual visual=new DrawingVisual();
             using(DrawingContext dc=visual.RenderOpen()) {
-                dc.DrawRectangle(Brush("#F4F1EA"),null,new Rect(0,0,960,480));
-                for(int i=0;i<interactionSprites.Frames.Length;i++)
-                    dc.DrawImage(interactionSprites.Frames[i],new Rect(i%4*240,i/4*240,240,240));
+                PetInteraction[] kinds={PetInteraction.Curious,PetInteraction.PlayYarn,PetInteraction.Petted,PetInteraction.Pout,PetInteraction.Excited};
+                dc.DrawRectangle(Brush("#F4F1EA"),null,new Rect(0,0,720,480));
+                for(int i=0;i<kinds.Length;i++)
+                    dc.DrawImage(interactionSprites.Frames[(int)kinds[i]-1],new Rect(i%3*240,i/3*240,240,240));
             }
-            RenderTargetBitmap bitmap=new RenderTargetBitmap(960,480,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);
+            RenderTargetBitmap bitmap=new RenderTargetBitmap(720,480,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);
             PngBitmapEncoder encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using(FileStream stream=File.Create(path))encoder.Save(stream);
         }
         void CaptureInteractionAnimationSheet(string path) {
             DrawingVisual visual=new DrawingVisual();
             using(DrawingContext dc=visual.RenderOpen()) {
-                dc.DrawRectangle(Brush("#F4F1EA"),null,new Rect(0,0,720,720));
-                for(int row=0;row<3;row++) {
+                dc.DrawRectangle(Brush("#F4F1EA"),null,new Rect(0,0,720,480));
+                for(int row=0;row<2;row++) {
                     for(int col=0;col<3;col++) {
-                        BitmapSource frame=row==0?interactionSprites.WaveAnimationFrames[col]:interactionSprites.AnimationFrames[row,col];
+                        BitmapSource frame=interactionSprites.AnimationFrames[row+1,col];
                         dc.DrawImage(frame,new Rect(col*240,row*240,240,240));
                     }
                 }
             }
-            RenderTargetBitmap bitmap=new RenderTargetBitmap(720,720,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);
+            RenderTargetBitmap bitmap=new RenderTargetBitmap(720,480,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);
             PngBitmapEncoder encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using(FileStream stream=File.Create(path))encoder.Save(stream);
         }
