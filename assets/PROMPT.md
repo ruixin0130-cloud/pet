@@ -21,3 +21,11 @@ Use case: stylized-concept. Asset type: transparent interaction sprite atlas for
 ```text
 Use case: illustration-story. Asset type: transparent PNG sprite atlas for a Windows desktop pet. Input image: the existing interaction atlas is a style and character reference only. Create one precise 3 columns by 3 rows animation atlas with nine evenly sized cells. Use the same fluffy grey-and-white kitten in every cell: round body, white face blaze and chest, brown eyes, pink ears and cheeks, soft hand-drawn pastel watercolor linework. Row 1, left to right: paw down preparing to wave; paw raised at the peak; paw returning with two subtle pink motion lines. Row 2: a gentle human hand approaches above the head; hand softly strokes the head while the kitten closes eyes happily; hand lifts away while the kitten keeps a delighted expression with one tiny pink heart. Row 3: kitten watches a small pink yarn ball; reaches one paw toward it; taps it so the ball rolls slightly with one short curved motion line. Exactly nine equal cells in a uniform 3×3 grid; each cell has a full kitten centered with consistent scale and transparent padding. Fully transparent background, no shadows, no ground, no checkerboard, no labels, no numbers, no borders, no grid lines, no logo, no watermark, no extra characters.
 ```
+
+## v0.5.1 挥手肢体修复
+
+原挥手的抬爪帧含有重复的落地前爪，因此新增 `tamago-wave-animation.png` 并由程序优先使用。图集为一行三帧：静止、抬爪、收回；抬爪帧严格只有一只抬起的前爪和一只落地的前爪。
+
+```text
+Use case: precise-object-edit. Asset type: transparent three-frame waving kitten animation. The exact character and watercolor style are preserved. Cell 1 has both front paws on the ground. In cells 2 and 3 there are exactly TWO visible front paws: one raised or lowering paw on the viewer's left and one grounded paw on the viewer's right. Remove the duplicate grounded paw under the raised limb and leave blank space there. Every kitten has exactly four paws total. No extra legs, floating paws, duplicate limbs, props, text, borders, grid, shadow, or watermark. Keep alpha transparency.
+```
