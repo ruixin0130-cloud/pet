@@ -5,6 +5,24 @@ namespace Tamago {
     static class Tests {
         static readonly List<string> results=new List<string>();
         static void Check(bool condition,string name) { if(!condition)throw new Exception(name);results.Add("PASS "+name); }
+        static void TestInteractionState() {
+            InteractionState state=new InteractionState();
+            Check(!state.Active&&state.Frame==-1,"interaction starts idle");
+            foreach(PetInteraction kind in Enum.GetValues(typeof(PetInteraction))) {
+                if(kind==PetInteraction.None)continue;
+                state.Start(kind);
+                Check(state.Active&&state.Frame==(int)kind-1&&state.Duration>0,"interaction starts "+kind);
+                double before=state.Elapsed;state.Tick(.05,false);
+                Check(state.Elapsed>before&&state.Active,"interaction advances "+kind);
+                for(int i=0;i<50;i++)state.Tick(.1,false);
+                Check(!state.Active&&state.Frame==-1,"interaction ends "+kind);
+                state.Start(kind);before=state.Elapsed;state.Tick(.1,true);
+                Check(state.Elapsed==before&&state.Active,"interaction pauses while blocked "+kind);
+                state.Clear();
+            }
+            state.Start(PetInteraction.PlayYarn);Check(state.Line.Contains("抓到"),"interaction includes a playful response");
+            Check(InteractionState.LabelFor(PetInteraction.Wave)=="挥手打招呼","interaction label is localized");
+        }
         static void TestDialogue() {
             DialogueScheduler d=new DialogueScheduler(new Random(123));
             Check(DialogueScheduler.Phrases.Count==6,"dialogue includes six reference phrases");
@@ -80,6 +98,7 @@ namespace Tamago {
                 Check(s.Size==170&&s.Speed==72&&double.IsNaN(s.X)&&double.IsNaN(s.Y),"invalid settings fall back safely");
                 s=PetSettings.Parse("this is not xml");Check(s.Size==170,"corrupt settings do not block startup");
                 TestDialogue();
+                TestInteractionState();
                 results.Add("SUCCESS "+results.Count+" checks passed");
                 File.WriteAllLines(Path.Combine(dir,"engine-tests.txt"),results.ToArray());return 0;
             } catch(Exception ex) {

@@ -16,6 +16,7 @@ $petArgs = @(
     "/win32manifest:$petProject\src\app.manifest",
     "/resource:$petProject\src\Panel.xaml,Panel.xaml",
     "/resource:$petProject\assets\tamago-sprites.png,tamago-sprites.png",
+    "/resource:$petProject\assets\tamago-interactions.png,tamago-interactions.png",
     "/reference:$petWpf\PresentationCore.dll",
     "/reference:$petWpf\PresentationFramework.dll",
     "/reference:$petWpf\WindowsBase.dll",
@@ -24,6 +25,7 @@ $petArgs = @(
     '/reference:System.Drawing.dll',
     '/reference:System.Xml.Linq.dll',
     "$petProject\src\PetEngine.cs",
+    "$petProject\src\Interaction.cs",
     "$petProject\src\App.cs",
     "$petProject\src\Tests.cs",
     "$petProject\src\Dialogue.cs"
