@@ -130,6 +130,19 @@ namespace Tamago {
                 e.Constrain(new Area(20,30,80,90));Check(e.X==20&&e.Y==30,"tiny work area remains finite");
                 e.SetAction(PetAction.WalkRight,true);e.X=700;double before=e.X;e.Tick(double.NaN,area);e.Tick(-1,area);Check(e.X==before,"invalid time cannot corrupt position");
                 e.Tick(10,area);Check(e.X-before<=e.Speed*.101,"resuming after a pause cannot teleport");
+                e.SetAutomatic(false);e.Energy=100;e.SetAction(PetAction.WalkRight,false);double energyBefore=e.Energy;
+                for(int i=0;i<10;i++)e.Tick(.1,area);
+                Check(e.Energy<energyBefore,"walking consumes energy");
+                e.Dragging=true;energyBefore=e.Energy;e.Tick(.1,area);e.Dragging=false;
+                Check(e.Energy==energyBefore,"dragging pauses the energy clock");
+                e.SetAutomatic(true);e.Energy=20;e.SetAction(PetAction.Idle,false);e.Tick(.1,area);
+                Check(e.Action==PetAction.Sleep,"low energy automatically starts rest");
+                for(int i=0;i<80;i++)e.Tick(.1,area);
+                Check(e.Action==PetAction.Idle&&e.Energy>=80,"rest restores energy and wakes automatically");
+                e.SetAutomatic(true);e.Energy=100;e.SetAction(PetAction.Idle,false);e.HoldAutomatic(3);
+                for(int i=0;i<20;i++)e.Tick(.1,area);
+                Check(e.AutomaticPaused&&e.Action==PetAction.Idle,"companion hold pauses automatic switching");
+                e.Energy=150;Check(e.Energy==100,"energy is capped at one hundred");e.Energy=-5;Check(e.Energy==0,"energy cannot be negative");e.Energy=double.NaN;Check(e.Energy==100,"invalid energy resets safely");
                 foreach(PetAction action in Enum.GetValues(typeof(PetAction))) {
                     e.SetAction(action,true);
                     for(int i=0;i<70;i++){e.Tick(.1,area);Check(e.Frame>=0&&e.Frame<16,"valid frame "+action+" "+i);}
