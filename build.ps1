@@ -14,6 +14,7 @@ $petArgs = @(
     '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/utf8output', '/codepage:65001',
     "/out:$petOutput",
     "/win32manifest:$petProject\src\app.manifest",
+    "/win32icon:$petProject\assets\tamago-app-icon.ico",
     "/resource:$petProject\src\Panel.xaml,Panel.xaml",
     "/resource:$petProject\assets\tamago-sprites.png,tamago-sprites.png",
     "/resource:$petProject\assets\tamago-interactions.png,tamago-interactions.png",

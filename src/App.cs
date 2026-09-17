@@ -292,7 +292,14 @@ namespace Tamago {
         }
         void CreateTray() {
             tray=new Forms.NotifyIcon { Text=profile.CharacterName+" · 小小的陪伴",Visible=true };
-            using(System.Drawing.Bitmap iconBitmap=new System.Drawing.Bitmap(32,32))
+            // The executable embeds the generated multi-size Tamago icon. Use it for both
+            // Explorer and the notification area, with a simple fallback for damaged builds.
+            try {
+                using(System.Drawing.Icon source=System.Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location)) {
+                    if(source!=null) tray.Icon=(System.Drawing.Icon)source.Clone();
+                }
+            } catch { }
+            if(tray.Icon==null)using(System.Drawing.Bitmap iconBitmap=new System.Drawing.Bitmap(32,32))
             using(System.Drawing.Graphics g=System.Drawing.Graphics.FromImage(iconBitmap)) {
                 g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 using(System.Drawing.SolidBrush b=new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(132,145,112))) {
