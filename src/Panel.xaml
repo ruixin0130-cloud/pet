@@ -24,7 +24,7 @@ WindowStartupLocation="CenterScreen" Background="#F8F6F1" FontFamily="Microsoft 
 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="22"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <Grid>
 <StackPanel><TextBlock Text="T A M A G O   /   D E S K T O P   P E T" FontSize="10" Foreground="#89917B"/>
-<StackPanel Orientation="Horizontal" Margin="0,8,0,0"><TextBlock x:Name="PanelTitle" Text="玉子的小小世界" FontSize="26" FontWeight="SemiBold"/><Border Background="#ECEFE4" CornerRadius="8" Margin="14,5,0,5" Padding="10,4"><TextBlock Text="本地角色包 · v0.8.0" Foreground="#748263" FontSize="10"/></Border></StackPanel>
+<StackPanel Orientation="Horizontal" Margin="0,8,0,0"><TextBlock x:Name="PanelTitle" Text="玉子的小小世界" FontSize="26" FontWeight="SemiBold"/><Border Background="#ECEFE4" CornerRadius="8" Margin="14,5,0,5" Padding="10,4"><TextBlock Text="生命状态 · v0.9.0" Foreground="#748263" FontSize="10"/></Border></StackPanel>
 <TextBlock x:Name="PanelSubtitle" Text="你忙你的，我会乖乖陪着你。" Margin="0,8,0,0" Foreground="#99938A" FontSize="12"/>
 </StackPanel>
 <Button x:Name="HidePanel" Content="收起面板 ↘" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,0,0" Padding="14,9" Background="#F8F6F1"/>
@@ -88,7 +88,8 @@ WindowStartupLocation="CenterScreen" Background="#F8F6F1" FontFamily="Microsoft 
 <Grid Margin="0,15,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="52"/><ColumnDefinition Width="*"/><ColumnDefinition Width="55"/></Grid.ColumnDefinitions>
 <TextBlock Text="精力" Foreground="#9A978D" FontSize="11" VerticalAlignment="Center"/><ProgressBar x:Name="EnergyBar" Grid.Column="1" Minimum="0" Maximum="100" Height="7" VerticalAlignment="Center" Foreground="#98A487" Background="#E9E8E0" BorderThickness="0"/><TextBlock x:Name="EnergyValue" Grid.Column="2" Text="100%" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" Foreground="#9A978D"/>
 </Grid>
-<Border Height="1" Background="#EEEBE4" Margin="0,17,0,12"/>
+<TextBlock x:Name="LifeStateValue" Text="状态 · 平静" FontSize="11" Foreground="#7B886B" Margin="0,9,0,0"/>
+<Border Height="1" Background="#EEEBE4" Margin="0,13,0,12"/>
 <Grid>
 <CheckBox x:Name="RandomSpeech" Content="随机聊聊天" VerticalAlignment="Center" VerticalContentAlignment="Center" FontSize="12" Foreground="#817E71"/>
 <Button x:Name="SpeakNow" Content="说一句 ♡" HorizontalAlignment="Right" Padding="12,6" Background="#F8F0EC" BorderBrush="#EBDDD4" Foreground="#AA8178" FontSize="11" ToolTip="立即随机说出参考图中的一句话"/>

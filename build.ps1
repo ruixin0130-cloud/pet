@@ -30,6 +30,7 @@ $petArgs = @(
     '/reference:System.Xml.Linq.dll',
     '/reference:System.Web.Extensions.dll',
     "$petProject\src\PetEngine.cs",
+    "$petProject\src\PetLifeState.cs",
     "$petProject\src\PetProfile.cs",
     "$petProject\src\PetAssets.cs",
     "$petProject\src\PackTests.cs",

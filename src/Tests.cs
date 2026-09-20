@@ -5,6 +5,51 @@ namespace Tamago {
     static class Tests {
         static readonly List<string> results=new List<string>();
         static void Check(bool condition,string name) { if(!condition)throw new Exception(name);results.Add("PASS "+name); }
+        static void TestLifeState() {
+            PetLifeState life=new PetLifeState();
+            Check(life.Snapshot.State==LifeState.Normal&&life.Snapshot.Code=="normal"&&
+                !life.Snapshot.SuggestedAction.HasValue,"life begins normal with an immutable observation");
+            life.Observe(.1,39,PetAction.WalkRight);
+            Check(life.Snapshot.State==LifeState.Tired&&life.Snapshot.SuggestedAction==PetAction.Idle,
+                "low energy makes a moving pet tired and suggests rest without changing its action");
+            life.Observe(.1,54,PetAction.Idle);
+            Check(life.Snapshot.State==LifeState.Tired,"tired state does not flicker during partial recovery");
+            life.Observe(.1,55,PetAction.Idle);
+            Check(life.Snapshot.State==LifeState.Normal,"sufficient energy clears tired state");
+            life.Record(LifeEvent.Petted,8);
+            Check(life.Snapshot.State==LifeState.Happy&&life.Snapshot.SuggestedAction==PetAction.Sit&&
+                life.Snapshot.HappySecondsLeft==8,"petting starts timed happiness and suggests a seated pose");
+            life.Observe(0,20,PetAction.Idle);
+            Check(life.Snapshot.State==LifeState.Happy,"happy moment temporarily takes priority over tiredness");
+            life.Observe(0,20,PetAction.Sleep);
+            Check(life.Snapshot.State==LifeState.Sleeping&&life.Snapshot.Code=="sleeping"&&
+                !life.Snapshot.SuggestedAction.HasValue,"sleep always has priority and remains owned by the engine");
+            life.Observe(0,20,PetAction.Idle);
+            Check(life.Snapshot.State==LifeState.Happy,"waking can continue an unexpired happy moment");
+            double remaining=life.Snapshot.HappySecondsLeft;
+            life.Observe(0,20,PetAction.Idle);
+            Check(life.Snapshot.HappySecondsLeft==remaining,"drag pause does not consume happiness");
+            life.Observe(double.NaN,20,PetAction.Idle);life.Observe(-1,20,PetAction.Idle);
+            Check(life.Snapshot.HappySecondsLeft==remaining,"invalid time cannot advance the life state");
+            for(int i=0;i<80;i++)life.Observe(.1,20,PetAction.Idle);
+            Check(life.Snapshot.State==LifeState.Tired&&life.Snapshot.HappySecondsLeft==0,
+                "expired happiness reveals the underlying tired state");
+            life.Record(LifeEvent.Played,8);
+            Check(life.Snapshot.State==LifeState.Happy&&life.Snapshot.HappySecondsLeft==5,
+                "playing starts a shorter happy moment");
+            life.Record(LifeEvent.Excited,8);
+            Check(life.Snapshot.HappySecondsLeft==5,"another event never shortens a current happy moment");
+            life.Observe(0,100,PetAction.Sleep);
+            Check(life.Snapshot.State==LifeState.Sleeping,"manual sleep has priority even with full energy");
+            PetProfile original=PetProfile.Current;
+            try {
+                PetProfile.Current=PetProfile.FromJson("{\"energy\":{\"sleepAt\":45,\"wakeAt\":82}}");
+                PetLifeState custom=new PetLifeState();custom.Observe(0,56,PetAction.Idle);
+                Check(custom.Snapshot.State==LifeState.Tired,"tired threshold follows the selected profile's sleep threshold");
+                custom.Observe(0,72,PetAction.Idle);
+                Check(custom.Snapshot.State==LifeState.Normal,"custom threshold still clears after recovery");
+            } finally {PetProfile.Current=original;}
+        }
         static void TestInteractionState() {
             InteractionState state=new InteractionState();
             Check(!state.Active,"interaction starts idle");
@@ -172,6 +217,7 @@ namespace Tamago {
                 Check(s.Size==170&&s.Speed==72&&double.IsNaN(s.X)&&double.IsNaN(s.Y),"invalid settings fall back safely");
                 s=PetSettings.Parse("this is not xml");Check(s.Size==170,"corrupt settings do not block startup");
                 PackTests.Run(Check);
+                TestLifeState();
                 TestProfile();
                 TestDialogue();
                 TestInteractionState();

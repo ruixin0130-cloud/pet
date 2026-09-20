@@ -15,8 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.8.0.0")]
-[assembly: AssemblyFileVersion("0.8.0.0")]
+[assembly: AssemblyVersion("0.9.0.0")]
+[assembly: AssemblyFileVersion("0.9.0.0")]
 
 namespace Tamago {
     static class Program {
@@ -47,6 +47,7 @@ namespace Tamago {
     public sealed class PetApp : Application {
         readonly bool smoke;
         readonly PetEngine engine=new PetEngine();
+        PetLifeState life=new PetLifeState();
         DialogueScheduler dialogue;
         readonly InteractionScheduler ambientInteractions=new InteractionScheduler();
         readonly InteractionState interaction=new InteractionState();
@@ -68,7 +69,7 @@ namespace Tamago {
         TranslateTransform bubbleShift=new TranslateTransform();
         TextBlock previewSpeech,speechHint;
         CheckBox speechCheck;
-        TextBlock bubbleText,zzz,heart,status,mode,sizeValue,speedValue,energyValue,previewZ,panelTitle,panelSubtitle;
+        TextBlock bubbleText,zzz,heart,status,mode,sizeValue,speedValue,energyValue,lifeStateValue,previewZ,panelTitle,panelSubtitle;
         Slider sizeSlider,speedSlider;
         ProgressBar energyBar;
         CheckBox topCheck;
@@ -139,7 +140,7 @@ namespace Tamago {
             previewImage=Find<Image>("PreviewImage");
             TransformGroup pgroup=new TransformGroup(); pgroup.Children.Add(previewScale); pgroup.Children.Add(previewTilt); pgroup.Children.Add(previewShift); previewImage.RenderTransform=pgroup;
             status=Find<TextBlock>("StatusLabel"); mode=Find<TextBlock>("ModeLabel"); previewZ=Find<TextBlock>("PreviewZ");
-            sizeValue=Find<TextBlock>("SizeValue"); speedValue=Find<TextBlock>("SpeedValue"); energyValue=Find<TextBlock>("EnergyValue");
+            sizeValue=Find<TextBlock>("SizeValue"); speedValue=Find<TextBlock>("SpeedValue"); energyValue=Find<TextBlock>("EnergyValue");lifeStateValue=Find<TextBlock>("LifeStateValue");
             sizeSlider=Find<Slider>("SizeSlider"); speedSlider=Find<Slider>("SpeedSlider"); energyBar=Find<ProgressBar>("EnergyBar"); topCheck=Find<CheckBox>("KeepOnTop");
             speechCheck=Find<CheckBox>("RandomSpeech");speechHint=Find<TextBlock>("SpeechHint");
             previewBubble=Find<Border>("PreviewBubble");previewSpeech=Find<TextBlock>("PreviewSpeech");
@@ -347,6 +348,9 @@ namespace Tamago {
                 companionUntil=Math.Max(companionUntil,now+profile.CompanionSeconds);
                 engine.HoldAutomatic(profile.CompanionSeconds);
             }
+            if(kind==PetInteraction.Petted)life.Record(LifeEvent.Petted,profile.CompanionSeconds);
+            else if(kind==PetInteraction.PlayYarn)life.Record(LifeEvent.Played,profile.CompanionSeconds);
+            else if(kind==PetInteraction.Excited)life.Record(LifeEvent.Excited,profile.CompanionSeconds);
             dialogue.Postpone(now+interaction.Duration);
             ambientInteractions.Postpone(now+interaction.Duration);
             if(manual)Say(interaction.Line,Math.Min(2.2,interaction.Duration));
@@ -436,6 +440,7 @@ namespace Tamago {
         void Tick(object sender,EventArgs args) {
             double now=clock.Elapsed.TotalSeconds,dt=now-previousTime;previousTime=now;
             engine.Tick(dt,WorkArea());
+            life.Observe(engine.Dragging?0:dt,engine.Energy,engine.Action);
             bool interactionWasActive=interaction.Active;
             interaction.Tick(dt,engine.Dragging||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump);
             if(interactionWasActive&&!interaction.Active&&interactionResumePending&&engine.Action==PetAction.Idle) {
@@ -443,11 +448,28 @@ namespace Tamago {
             }
             UpdateGaze();
             AdvanceAmbientInteraction(now);
+            ApplyLifeSuggestion();
             AdvanceDialogue(now);ApplyLayout();Refresh();
             if(now-lastSave>4){Save();lastSave=now;}
         }
+        void ApplyLifeSuggestion() {
+            LifeSnapshot current=life.Snapshot;
+            if(!engine.Automatic||engine.Dragging||interaction.Active||
+                engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||!current.SuggestedAction.HasValue)return;
+            PetAction suggested=current.SuggestedAction.Value;
+            if(engine.Action!=suggested)engine.SetAction(suggested,false);
+        }
+        static string LifeLabel(LifeState state) {
+            switch(state) {
+                case LifeState.Happy:return "开心";
+                case LifeState.Tired:return "疲惫";
+                case LifeState.Sleeping:return "睡眠";
+                default:return "平静";
+            }
+        }
         void Refresh() {
             double now=clock.Elapsed.TotalSeconds;
+            life.Observe(0,engine.Energy,engine.Action);
             bool moving=IsMoving();
             bool petted=now<petUntil;
             bool looking=gaze.Active&&!interaction.Active;
@@ -478,6 +500,7 @@ namespace Tamago {
             autoButton.Background=Brush(engine.Automatic?"#E1E8D5":"#FFFFFF");
             autoButton.BorderBrush=Brush(engine.Automatic?"#98A487":"#E8E5DC");
             energyBar.Value=engine.Energy;energyValue.Text=((int)Math.Round(engine.Energy))+"%";
+            lifeStateValue.Text="状态 · "+LifeLabel(life.Snapshot.State);
             foreach(KeyValuePair<PetInteraction,Button> item in interactionButtons) {
                 bool selected=interaction.Active&&interaction.Kind==item.Key;
                 item.Value.Background=Brush(selected?"#F9EDEA":"#FFFFFF");
@@ -553,6 +576,7 @@ namespace Tamago {
                 checks.Add("PASS validated cached role assets: "+assets.Id);
                 engine.SetAction(PetAction.Idle,false);engine.Automatic=true;Refresh();ApplyLayout();
                 TestInteractionUi(checks);
+                TestLifeUi(checks,output);
                 CaptureInteractionSheet(Path.Combine(output,"interaction-preview.png"));
                 CaptureInteractionAnimationSheet(Path.Combine(output,"interaction-animation-preview.png"));
                 TestGazeUi(checks);
@@ -569,6 +593,51 @@ namespace Tamago {
                 ShowPanel();if(!panel.IsVisible)throw new Exception("恢复面板失败");checks.Add("PASS hide and reopen panel");
                 StartLiveSpeechTest(checks,output);
             } catch(Exception e) { File.WriteAllText(Path.Combine(output,"smoke-test.txt"),string.Join(Environment.NewLine,checks.ToArray())+Environment.NewLine+"FAIL "+e);quitting=true;Shutdown(1); }
+        }
+        void TestLifeUi(List<string> checks,string output) {
+            interaction.Clear();gaze.Clear();petUntil=0;companionUntil=0;
+            engine.SetAutomatic(true);engine.Energy=39;engine.SetAction(PetAction.WalkRight,false);
+            life=new PetLifeState();life.Observe(0,engine.Energy,engine.Action);
+            ApplyLifeSuggestion();Refresh();panel.UpdateLayout();
+            if(life.Snapshot.State!=LifeState.Tired||engine.Action!=PetAction.Idle||lifeStateValue.Text!="状态 · 疲惫"||
+                !Object.ReferenceEquals(petImage.Source,assets.Action(PetAction.Idle).At(engine.Elapsed,0)))
+                throw new Exception("疲惫状态没有让自动移动停下待机");
+            Capture(panel,Path.Combine(output,"life-tired-panel.png"));
+            life.Record(LifeEvent.Petted,profile.CompanionSeconds);ApplyLifeSuggestion();Refresh();panel.UpdateLayout();
+            if(life.Snapshot.State!=LifeState.Happy||engine.Action!=PetAction.Sit||lifeStateValue.Text!="状态 · 开心"||
+                !Object.ReferenceEquals(petImage.Source,assets.Action(PetAction.Sit).At(engine.Elapsed,0)))
+                throw new Exception("开心状态没有显示坐姿");
+            Capture(panel,Path.Combine(output,"life-happy-panel.png"));
+            engine.Energy=20;engine.SetAction(PetAction.Idle,false);engine.Tick(.1,WorkArea());
+            life.Observe(.1,engine.Energy,engine.Action);ApplyLifeSuggestion();Refresh();panel.UpdateLayout();
+            if(life.Snapshot.State!=LifeState.Sleeping||engine.Action!=PetAction.Sleep||lifeStateValue.Text!="状态 · 睡眠")
+                throw new Exception("低精力自动睡眠被生命状态覆盖");
+            Capture(panel,Path.Combine(output,"life-sleeping-panel.png"));
+            engine.Energy=83;engine.Tick(.1,WorkArea());life.Observe(.1,engine.Energy,engine.Action);
+            ApplyLifeSuggestion();Refresh();
+            if(life.Snapshot.State!=LifeState.Happy||engine.Action!=PetAction.Sit)
+                throw new Exception("自动醒来后没有恢复有效的开心状态");
+            life=new PetLifeState();engine.SetAutomatic(true);
+            engine.Energy=profile.Energy.SleepAt+1;engine.SetAction(PetAction.WalkRight,false);
+            for(int i=0;i<100&&engine.Action!=PetAction.Sleep;i++) {
+                engine.Tick(.1,WorkArea());life.Observe(.1,engine.Energy,engine.Action);ApplyLifeSuggestion();
+            }
+            if(engine.Action!=PetAction.Sleep||life.Snapshot.State!=LifeState.Sleeping)
+                throw new Exception("疲惫待机阻止了原有的低精力自动睡眠");
+            engine.Energy=83;
+            engine.SetAction(PetAction.WalkRight,true);ApplyLifeSuggestion();Refresh();
+            life.Record(LifeEvent.Petted,profile.CompanionSeconds);life.Observe(0,engine.Energy,engine.Action);
+            ApplyLifeSuggestion();Refresh();
+            if(engine.Action!=PetAction.WalkRight||engine.Automatic)throw new Exception("生命状态覆盖了手动动作");
+            engine.SetAutomatic(true);engine.SetAction(PetAction.WalkRight,false);engine.Dragging=true;
+            double before=life.Snapshot.HappySecondsLeft;
+            life.Observe(0,engine.Energy,engine.Action);ApplyLifeSuggestion();
+            if(engine.Action!=PetAction.WalkRight||life.Snapshot.HappySecondsLeft!=before)
+                throw new Exception("拖拽期间生命状态改变动作或计时");
+            engine.Dragging=false;
+            life=new PetLifeState();engine.Energy=100;engine.SetAutomatic(true);
+            engine.SetAction(PetAction.Idle,false);engine.ClearAutomaticHold();Refresh();
+            checks.Add("PASS life state changes actions, preserves automatic sleep and manual drag control");
         }
         void TestInteractionUi(List<string> checks) {
             foreach(PetInteraction kind in Enum.GetValues(typeof(PetInteraction))) {
