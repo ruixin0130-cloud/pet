@@ -1,0 +1,414 @@
+{
+  "actions": {
+    "Idle": {
+      "frames": [
+        {
+          "time": 2.8,
+          "rect": [
+            0,
+            0,
+            318,
+            336
+          ],
+          "image": "base"
+        },
+        {
+          "time": 1.5,
+          "rect": [
+            958,
+            0,
+            296,
+            336
+          ],
+          "image": "base"
+        },
+        {
+          "time": 1.25,
+          "rect": [
+            0,
+            0,
+            318,
+            336
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.17,
+          "rect": [
+            318,
+            0,
+            321,
+            336
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.15,
+          "rect": [
+            639,
+            0,
+            319,
+            336
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.13,
+          "rect": [
+            318,
+            0,
+            321,
+            336
+          ],
+          "image": "base"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true,
+      "touchedFrame": 4
+    },
+    "WalkLeft": {
+      "frames": [
+        {
+          "time": 0.14285714285714285,
+          "rect": [
+            0,
+            336,
+            318,
+            319
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.14285714285714285,
+          "rect": [
+            318,
+            336,
+            321,
+            319
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.14285714285714285,
+          "rect": [
+            639,
+            336,
+            319,
+            319
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.14285714285714285,
+          "rect": [
+            958,
+            336,
+            296,
+            319
+          ],
+          "image": "base"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    },
+    "WalkRight": {
+      "frames": [
+        {
+          "time": 0.14285714285714285,
+          "rect": [
+            0,
+            336,
+            318,
+            319
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.14285714285714285,
+          "rect": [
+            318,
+            336,
+            321,
+            319
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.14285714285714285,
+          "rect": [
+            639,
+            336,
+            319,
+            319
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.14285714285714285,
+          "rect": [
+            958,
+            336,
+            296,
+            319
+          ],
+          "image": "base"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    },
+    "Run": {
+      "frames": [
+        {
+          "time": 0.09090909090909091,
+          "rect": [
+            0,
+            655,
+            318,
+            275
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.09090909090909091,
+          "rect": [
+            318,
+            655,
+            321,
+            275
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.09090909090909091,
+          "rect": [
+            639,
+            655,
+            319,
+            275
+          ],
+          "image": "base"
+        },
+        {
+          "time": 0.09090909090909091,
+          "rect": [
+            958,
+            655,
+            296,
+            275
+          ],
+          "image": "base"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    },
+    "Sit": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            0,
+            930,
+            318,
+            324
+          ],
+          "image": "base"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": false
+    },
+    "Lie": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            318,
+            930,
+            321,
+            324
+          ],
+          "image": "base"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": false
+    },
+    "Sleep": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            639,
+            930,
+            319,
+            324
+          ],
+          "image": "base"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": false
+    },
+    "Jump": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            958,
+            930,
+            296,
+            324
+          ],
+          "image": "base"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": false
+    }
+  },
+  "version": 1,
+  "interactions": {
+    "Curious": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            443,
+            0,
+            444,
+            443
+          ],
+          "image": "interact"
+        }
+      ],
+      "facing": "right",
+      "mirror": false,
+      "loop": false
+    },
+    "PlayYarn": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            0,
+            827,
+            422,
+            414
+          ],
+          "image": "animated"
+        },
+        {
+          "time": 1,
+          "rect": [
+            422,
+            827,
+            423,
+            414
+          ],
+          "image": "animated"
+        },
+        {
+          "time": 1,
+          "rect": [
+            845,
+            827,
+            423,
+            414
+          ],
+          "image": "animated"
+        }
+      ],
+      "facing": "right",
+      "mirror": false,
+      "loop": false
+    },
+    "Petted": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            0,
+            413,
+            422,
+            414
+          ],
+          "image": "animated"
+        },
+        {
+          "time": 1,
+          "rect": [
+            422,
+            413,
+            423,
+            414
+          ],
+          "image": "animated"
+        },
+        {
+          "time": 1,
+          "rect": [
+            845,
+            413,
+            423,
+            414
+          ],
+          "image": "animated"
+        }
+      ],
+      "facing": "right",
+      "mirror": false,
+      "loop": false
+    },
+    "Pout": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            443,
+            443,
+            444,
+            444
+          ],
+          "image": "interact"
+        }
+      ],
+      "facing": "right",
+      "mirror": false,
+      "loop": false
+    },
+    "Excited": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            1330,
+            443,
+            444,
+            444
+          ],
+          "image": "interact"
+        }
+      ],
+      "facing": "right",
+      "mirror": false,
+      "loop": false
+    }
+  },
+  "images": {
+    "base": "tamago-sprites.png",
+    "interact": "tamago-interactions.png",
+    "animated": "tamago-interaction-animations.png"
+  }
+}

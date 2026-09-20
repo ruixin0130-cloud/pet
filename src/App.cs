@@ -15,8 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.7.0.0")]
-[assembly: AssemblyFileVersion("0.7.0.0")]
+[assembly: AssemblyVersion("0.8.0.0")]
+[assembly: AssemblyFileVersion("0.8.0.0")]
 
 namespace Tamago {
     static class Program {
@@ -44,56 +44,6 @@ namespace Tamago {
         [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr handle);
         public static readonly uint ShowMessage=RegisterWindowMessage("Tamago.DesktopPet.Show.v01");
     }
-    public sealed class SpriteBank {
-        public readonly BitmapSource[] Frames=new BitmapSource[16];
-        public readonly BitmapSource Atlas;
-        public SpriteBank() {
-            using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("tamago-sprites.png")) {
-                if(input==null)throw new FileNotFoundException("缺少猫咪动作素材，请重新运行 build.ps1。");
-                PngBitmapDecoder decoder=new PngBitmapDecoder(input,BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);
-                Atlas=decoder.Frames[0]; Atlas.Freeze();
-            }
-            // Row separators follow the generated atlas; each pose is rendered at a common scale.
-            double[] rows={0,.268,.523,.742,1};
-            double[] cols={0,.254,.51,.764,1};
-            for(int row=0;row<4;row++)for(int col=0;col<4;col++) {
-                int x=(int)(cols[col]*Atlas.PixelWidth), y=(int)(rows[row]*Atlas.PixelHeight);
-                int right=(int)(cols[col+1]*Atlas.PixelWidth), bottom=(int)(rows[row+1]*Atlas.PixelHeight);
-                CroppedBitmap crop=new CroppedBitmap(Atlas,new Int32Rect(x,y,right-x,bottom-y));
-                crop.Freeze(); Frames[row*4+col]=crop;
-            }
-        }
-    }
-    public sealed class InteractionBank {
-        public readonly BitmapSource[] Frames=new BitmapSource[8];
-        public readonly BitmapSource[,] AnimationFrames=new BitmapSource[3,3];
-        public readonly BitmapSource Atlas;
-        public readonly BitmapSource AnimationAtlas;
-        public InteractionBank() {
-            using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("tamago-interactions.png")) {
-                if(input==null)throw new FileNotFoundException("缺少互动动作素材，请重新运行 build.ps1。");
-                PngBitmapDecoder decoder=new PngBitmapDecoder(input,BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);
-                Atlas=decoder.Frames[0]; Atlas.Freeze();
-            }
-            for(int row=0;row<2;row++)for(int col=0;col<4;col++) {
-                int x=(int)Math.Floor(col*Atlas.PixelWidth/4.0), y=(int)Math.Floor(row*Atlas.PixelHeight/2.0);
-                int right=(int)Math.Floor((col+1)*Atlas.PixelWidth/4.0), bottom=(int)Math.Floor((row+1)*Atlas.PixelHeight/2.0);
-                CroppedBitmap crop=new CroppedBitmap(Atlas,new Int32Rect(x,y,right-x,bottom-y));
-                crop.Freeze(); Frames[row*4+col]=crop;
-            }
-            using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("tamago-interaction-animations.png")) {
-                if(input==null)throw new FileNotFoundException("缺少互动动画素材，请重新运行 build.ps1。\n");
-                PngBitmapDecoder decoder=new PngBitmapDecoder(input,BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);
-                AnimationAtlas=decoder.Frames[0]; AnimationAtlas.Freeze();
-            }
-            for(int row=0;row<3;row++)for(int col=0;col<3;col++) {
-                int x=(int)Math.Floor(col*AnimationAtlas.PixelWidth/3.0), y=(int)Math.Floor(row*AnimationAtlas.PixelHeight/3.0);
-                int right=(int)Math.Floor((col+1)*AnimationAtlas.PixelWidth/3.0), bottom=(int)Math.Floor((row+1)*AnimationAtlas.PixelHeight/3.0);
-                CroppedBitmap crop=new CroppedBitmap(AnimationAtlas,new Int32Rect(x,y,right-x,bottom-y));
-                crop.Freeze(); AnimationFrames[row,col]=crop;
-            }
-        }
-    }
     public sealed class PetApp : Application {
         readonly bool smoke;
         readonly PetEngine engine=new PetEngine();
@@ -108,8 +58,8 @@ namespace Tamago {
         bool interactionResumePending,interactionResumeFacingLeft;
         bool quitting,pressed,moved,suppressClick,initialized;
         Point dragStart,windowStart;
-        SpriteBank sprites;
-        InteractionBank interactionSprites;
+        PetAssets assets;
+
         Window pet,panel;
         Canvas canvas;
         Image petImage,previewImage;
@@ -136,16 +86,13 @@ namespace Tamago {
         bool lastTop=true;
         string lastSettings;
         string SettingsFile { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"TamagoPet","settings.xml"); } }
-        string ContentFile { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"content","tamago-profile.json"); } }
         PetProfile profile=PetProfile.Current;
         public PetApp(bool isSmoke) { smoke=isSmoke; ShutdownMode=ShutdownMode.OnExplicitShutdown; }
         protected override void OnStartup(StartupEventArgs e) {
             base.OnStartup(e);
-            string profileError;
-            profile=PetProfile.Load(ContentFile,out profileError);PetProfile.Current=profile;
+            assets=PetAssets.Load(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"content"));
+            profile=assets.Profile;PetProfile.Current=profile;
             dialogue=new DialogueScheduler();
-            sprites=new SpriteBank();
-            interactionSprites=new InteractionBank();
             PetSettings saved=new PetSettings();
             if(!smoke) {
                 try { if(File.Exists(SettingsFile))saved=PetSettings.Parse(File.ReadAllText(SettingsFile)); }
@@ -173,6 +120,11 @@ namespace Tamago {
         }
         T Find<T>(string name) where T:class { return panel.FindName(name) as T; }
         static SolidColorBrush Brush(string color) { return (SolidColorBrush)new BrushConverter().ConvertFromString(color); }
+        static void SetButtonLabel(Button button,string label) {
+            StackPanel content=button.Content as StackPanel;
+            if(content!=null&&content.Children.Count>0) { TextBlock text=content.Children[content.Children.Count-1] as TextBlock; if(text!=null){text.Text=label;text.TextWrapping=TextWrapping.Wrap;text.TextAlignment=TextAlignment.Center;text.FontSize=11;} }
+            button.ToolTip=label;
+        }
         void CreatePanel() {
             using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("Panel.xaml"))
                 panel=(Window)XamlReader.Load(input);
@@ -180,6 +132,10 @@ namespace Tamago {
             panel.Title=profile.CharacterName+" · 小小的陪伴";
             panelTitle.Text=profile.CharacterName+"的小小世界";
             panelSubtitle.Text=profile.CharacterName+"会乖乖陪着你。";
+            Find<TextBlock>("PackStatus").Text=assets.Error??("当前角色："+profile.CharacterName+" · 重启后应用素材包" );
+            Find<TextBlock>("DragHint").Text="拖动 · 把"+profile.CharacterName+"放在喜欢的地方";
+            Find<TextBlock>("ActionHeading").Text="让"+profile.CharacterName+"动一动";
+            Find<Button>("FindPet").Content="⌖  找回"+profile.CharacterName;
             previewImage=Find<Image>("PreviewImage");
             TransformGroup pgroup=new TransformGroup(); pgroup.Children.Add(previewScale); pgroup.Children.Add(previewTilt); pgroup.Children.Add(previewShift); previewImage.RenderTransform=pgroup;
             status=Find<TextBlock>("StatusLabel"); mode=Find<TextBlock>("ModeLabel"); previewZ=Find<TextBlock>("PreviewZ");
@@ -193,14 +149,14 @@ namespace Tamago {
             foreach(PetAction a in Enum.GetValues(typeof(PetAction))) {
                 PetAction captured=a;
                 Button button=Find<Button>("Action"+a);
-                actionButtons[a]=button;
+                actionButtons[a]=button; SetButtonLabel(button,profile.ActionLabel(a));
                 button.Click+=delegate { ChangeAction(captured); };
             }
             foreach(PetInteraction i in Enum.GetValues(typeof(PetInteraction))) {
                 if(i==PetInteraction.None)continue;
                 PetInteraction captured=i;
                 Button button=Find<Button>("Interaction"+i);
-                interactionButtons[i]=button;
+                interactionButtons[i]=button; SetButtonLabel(button,profile.Interaction(i).Label);
                 button.Click+=delegate { TriggerInteraction(captured,true); };
             }
             autoButton=Find<Button>("ActionAuto");
@@ -233,7 +189,7 @@ namespace Tamago {
         void CreatePet(bool topmost) {
             pet=new Window { Width=engine.WindowWidth,Height=engine.WindowHeight,WindowStyle=WindowStyle.None,
                 ResizeMode=ResizeMode.NoResize,AllowsTransparency=true,Background=Brushes.Transparent,Topmost=topmost,
-                ShowInTaskbar=false,ShowActivated=false,Title="玉子 · 桌宠",UseLayoutRounding=true };
+                ShowInTaskbar=false,ShowActivated=false,Title=profile.CharacterName+" · 桌宠",UseLayoutRounding=true };
             lastTop=topmost;
             if(smoke)pet.IsHitTestVisible=false;
             canvas=new Canvas(); pet.Content=canvas;
@@ -268,11 +224,11 @@ namespace Tamago {
             pet.MouseLeftButtonDown+=MouseDown; pet.MouseMove+=MouseMove; pet.MouseLeftButtonUp+=MouseUp;
             pet.LostMouseCapture+=delegate { if(pressed){pressed=false;engine.Dragging=false;engine.Constrain(WorkArea());} };
             ContextMenu menu=new ContextMenu { FontFamily=new FontFamily("Microsoft YaHei UI") };
-            AddItem(menu,"打开动作面板",ShowPanel);AddItem(menu,"玉子，说一句",SpeakNow);menu.Items.Add(new Separator());
+            AddItem(menu,"打开动作面板",ShowPanel);AddItem(menu,profile.CharacterName+"，说一句",SpeakNow);menu.Items.Add(new Separator());
             foreach(PetAction a in Enum.GetValues(typeof(PetAction))) {
                 PetAction captured=a;
-                string[] labels={"待机","向左走","向右走","跑步","坐下","趴下","睡觉","跳跃"};
-                AddItem(menu,labels[(int)a],delegate { ChangeAction(captured); });
+
+                AddItem(menu,profile.ActionLabel(a),delegate { ChangeAction(captured); });
             }
             menu.Items.Add(new Separator());
             foreach(PetInteraction i in Enum.GetValues(typeof(PetInteraction))) {
@@ -281,7 +237,7 @@ namespace Tamago {
                 AddItem(menu,InteractionLabel(captured),delegate { TriggerInteraction(captured,true); });
             }
             menu.Items.Add(new Separator());AddItem(menu,"自由活动",delegate {SetAutomaticMode(true,true);});
-            AddItem(menu,"找回玉子",Home);AddItem(menu,"退出玉子",Quit);
+            AddItem(menu,"找回"+profile.CharacterName,Home);AddItem(menu,"退出"+profile.CharacterName,Quit);
             menu.Opened+=delegate { engine.Dragging=true; };
             menu.Closed+=delegate { engine.Dragging=false; };
             pet.ContextMenu=menu;
@@ -311,10 +267,10 @@ namespace Tamago {
             }
             Forms.ContextMenuStrip menu=new Forms.ContextMenuStrip();
             menu.Items.Add("打开动作面板",null,delegate {Dispatcher.Invoke(new Action(ShowPanel));});
-            menu.Items.Add("玉子，说一句",null,delegate {Dispatcher.Invoke(new Action(SpeakNow));});
-            menu.Items.Add("互动动作",null,delegate {Dispatcher.Invoke(new Action(delegate { TriggerInteraction(PetInteraction.Petted,true); }));});
-            menu.Items.Add("找回玉子",null,delegate {Dispatcher.Invoke(new Action(Home));});
-            menu.Items.Add("退出玉子",null,delegate {Dispatcher.Invoke(new Action(Quit));});
+            menu.Items.Add(profile.CharacterName+"，说一句",null,delegate {Dispatcher.Invoke(new Action(SpeakNow));});
+            menu.Items.Add(profile.Interaction(PetInteraction.Petted).Label,null,delegate {Dispatcher.Invoke(new Action(delegate { TriggerInteraction(PetInteraction.Petted,true); }));});
+            menu.Items.Add("找回"+profile.CharacterName,null,delegate {Dispatcher.Invoke(new Action(Home));});
+            menu.Items.Add("退出"+profile.CharacterName,null,delegate {Dispatcher.Invoke(new Action(Quit));});
             tray.ContextMenuStrip=menu;
             tray.DoubleClick+=delegate {Dispatcher.Invoke(new Action(ShowPanel));};
         }
@@ -351,7 +307,7 @@ namespace Tamago {
                 petUntil=clock.Elapsed.TotalSeconds+2;
                 if(engine.Action==PetAction.Sleep)engine.SetAction(PetAction.Idle,false);
                 TriggerInteraction(PetInteraction.Petted,false);
-                Say("呼噜呼噜～",2);
+                Say(profile.Interaction(PetInteraction.Petted).Line,Math.Min(2,interaction.Duration));
             }
             else interaction.Clear();
             engine.Constrain(WorkArea());ApplyLayout();Save();
@@ -495,15 +451,12 @@ namespace Tamago {
             bool moving=IsMoving();
             bool petted=now<petUntil;
             bool looking=gaze.Active&&!interaction.Active;
-            int frame=petted&&!moving&&engine.Action!=PetAction.Jump?2:engine.Frame;
-            if(interaction.Active) {
-                BitmapSource animation=interaction.HasAnimation?interactionSprites.AnimationFrames[interaction.AnimationRow,interaction.AnimationFrame]:interactionSprites.Frames[interaction.Frame];
-                petImage.Source=animation;previewImage.Source=animation;
-            } else {
-                petImage.Source=sprites.Frames[frame];previewImage.Source=sprites.Frames[frame];
-            }
+            PetClip clip=interaction.Active?assets.Interaction(interaction.Kind):assets.Action(engine.Action);
+            BitmapSource frame=interaction.Active?clip.At(interaction.Elapsed,interaction.Duration):
+                (petted&&!moving&&engine.Action!=PetAction.Jump?clip.Touched(engine.Elapsed):clip.At(engine.Elapsed,0));
+            petImage.Source=previewImage.Source=frame;
             double breathing=1+Math.Sin(engine.Elapsed*(engine.Action==PetAction.Sleep?1.8:2.2))*.013;
-            petScale.ScaleX=previewScale.ScaleX=interaction.Active?1:(looking?(gaze.FacingLeft?-1:1):(moving&&engine.FacingLeft?-1:1));
+            petScale.ScaleX=previewScale.ScaleX=clip.ScaleX(interaction.Active?engine.FacingLeft:(looking?gaze.FacingLeft:(moving&&engine.FacingLeft)));
             petScale.ScaleY=previewScale.ScaleY=breathing;
             petTilt.Angle=looking?gaze.Tilt:0;previewTilt.Angle=looking?gaze.Tilt*.55:0;
             petShift.X=looking?gaze.Offset:0;previewShift.X=looking?gaze.Offset*.55:0;
@@ -554,10 +507,39 @@ namespace Tamago {
             List<string> checks=new List<string>();
             try {
                 timer.Stop();
+                if(panelTitle.Text!=profile.CharacterName+"的小小世界"||Find<Button>("FindPet").Content.ToString()!="⌖  找回"+profile.CharacterName)
+                    throw new Exception("角色名称没有应用到面板");
+                if(assets.Error!=null&&Find<TextBlock>("PackStatus").Text!=assets.Error)throw new Exception("回退原因没有显示");
+                foreach(var entry in actionButtons) {
+                    StackPanel content=entry.Value.Content as StackPanel;
+                    if(content==null||((TextBlock)content.Children[content.Children.Count-1]).Text!=profile.ActionLabel(entry.Key))throw new Exception("动作标签没有应用");
+                }
+                if(((MenuItem)pet.ContextMenu.Items[1]).Header.ToString()!=profile.CharacterName+"，说一句")throw new Exception("右键名称没有应用");
+                CreateTray();tray.Visible=false;
+                if(tray.Text!=profile.CharacterName+" · 小小的陪伴"||tray.ContextMenuStrip.Items[2].Text!=profile.Interaction(PetInteraction.Petted).Label)throw new Exception("托盘档案没有应用");
+                checks.Add("PASS profile UI: "+profile.CharacterName+"; pack="+assets.Id+"; fallback="+(assets.Error??"none"));
+                // Exercise the real Refresh path against every configured frame, without relying on atlas slots.
+                interaction.Clear();petUntil=0;gaze.Clear();
+                foreach(PetAction action in Enum.GetValues(typeof(PetAction))) {
+                    engine.SetAction(action,true);PetClip clip=assets.Action(action);double elapsed=0;
+                    for(int index=0;index<clip.Count;index++) {
+                        while(clip.Index(elapsed,0)!=index&&elapsed<clip.Length)elapsed+=.001;
+                        engine.Elapsed=elapsed;Refresh();
+                        if(!Object.ReferenceEquals(petImage.Source,clip.At(elapsed,0)))throw new Exception("基础帧未实际切换");
+                    }
+                }
+                foreach(PetInteraction kind in Enum.GetValues(typeof(PetInteraction)))if(kind!=PetInteraction.None) {
+                    interaction.Start(kind);Refresh();double duration=interaction.Duration;PetClip clip=assets.Interaction(kind);
+                    while(interaction.Active) {
+                        Refresh();if(!Object.ReferenceEquals(petImage.Source,clip.At(interaction.Elapsed,duration)))throw new Exception("互动帧未实际切换");
+                        interaction.Tick(.025,false);
+                    }
+                }
+                checks.Add("PASS Refresh selects configured basic and interaction frames");
                 foreach(PetAction a in Enum.GetValues(typeof(PetAction))) {
                     actionButtons[a].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     if(engine.Action!=a||engine.Automatic)throw new Exception("动作按钮未正确切换："+a);
-                    Refresh();checks.Add("PASS button "+a+" -> frame "+engine.Frame);
+                    Refresh();checks.Add("PASS button "+a+" -> frame "+assets.Action(a).Index(engine.Elapsed,0));
                 }
                 autoButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 if(!engine.Automatic)throw new Exception("自由活动未开启");checks.Add("PASS automatic button");
@@ -568,14 +550,7 @@ namespace Tamago {
                 topCheck.IsChecked=true;if(!pet.Topmost)throw new Exception("置顶无法开启");checks.Add("PASS topmost toggle");
                 engine.X=-50000;engine.Y=-50000;Find<Button>("FindPet").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 if(engine.X<0||engine.Y<0)throw new Exception("找回失败");checks.Add("PASS recover position");
-                foreach(BitmapSource frame in sprites.Frames)if(frame.PixelWidth<1||frame.PixelHeight<1)throw new Exception("空动作帧");
-                checks.Add("PASS all 16 sprite frames decode");
-                foreach(BitmapSource frame in interactionSprites.Frames)if(frame.PixelWidth<1||frame.PixelHeight<1)throw new Exception("空互动动作帧");
-                checks.Add("PASS all 8 interaction frames decode");
-                for(int row=1;row<3;row++)for(int col=0;col<3;col++)
-                    if(interactionSprites.AnimationFrames[row,col].PixelWidth<1||interactionSprites.AnimationFrames[row,col].PixelHeight<1)
-                        throw new Exception("空互动动画帧");
-                checks.Add("PASS all 6 active interaction animation frames decode");
+                checks.Add("PASS validated cached role assets: "+assets.Id);
                 engine.SetAction(PetAction.Idle,false);engine.Automatic=true;Refresh();ApplyLayout();
                 TestInteractionUi(checks);
                 CaptureInteractionSheet(Path.Combine(output,"interaction-preview.png"));
@@ -599,9 +574,9 @@ namespace Tamago {
             foreach(PetInteraction kind in Enum.GetValues(typeof(PetInteraction))) {
                 if(kind==PetInteraction.None)continue;
                 interactionButtons[kind].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                if(!interaction.Active||interaction.Kind!=kind||interaction.Frame<0||interaction.Frame>=interactionSprites.Frames.Length)
+                if(!interaction.Active||interaction.Kind!=kind||assets.Interaction(kind).Count<1)
                     throw new Exception("互动按钮未正确切换："+kind);
-                Refresh();checks.Add("PASS interaction "+kind+" -> frame "+interaction.Frame);
+                Refresh();checks.Add("PASS interaction "+kind+" -> frame "+assets.Interaction(kind).Index(interaction.Elapsed,interaction.Duration));
             }
             interaction.Clear();engine.SetAction(PetAction.Sleep,true);TriggerInteraction(PetInteraction.Petted,true);
             if(engine.Action==PetAction.Sleep||!interaction.Active)throw new Exception("被摸互动未唤醒睡觉状态");
@@ -720,7 +695,7 @@ namespace Tamago {
                     // repeated offscreen Window snapshots can omit cached Image visuals.
                     dc.PushClip(new RectangleGeometry(new Rect(cellX,cellY,pet.Width,100)));
                     dc.DrawImage(shot,new Rect(cellX,cellY,pet.Width,pet.Height));dc.Pop();
-                    BitmapSource frame=sprites.Frames[0];
+                    BitmapSource frame=assets.Action(PetAction.Idle).At(0,0);
                     double scale=Math.Min(engine.Size/frame.PixelWidth,engine.Size/frame.PixelHeight);
                     double width=frame.PixelWidth*scale,height=frame.PixelHeight*scale;
                     dc.DrawImage(frame,new Rect(cellX+(pet.Width-width)/2,cellY+100+(engine.Size-height)/2,width,height));
@@ -736,7 +711,7 @@ namespace Tamago {
                 PetInteraction[] kinds={PetInteraction.Curious,PetInteraction.PlayYarn,PetInteraction.Petted,PetInteraction.Pout,PetInteraction.Excited};
                 dc.DrawRectangle(Brush("#F4F1EA"),null,new Rect(0,0,720,480));
                 for(int i=0;i<kinds.Length;i++)
-                    dc.DrawImage(interactionSprites.Frames[(int)kinds[i]-1],new Rect(i%3*240,i/3*240,240,240));
+                    dc.DrawImage(assets.Interaction(kinds[i]).At(0,profile.Interaction(kinds[i]).Duration),new Rect(i%3*240,i/3*240,240,240));
             }
             RenderTargetBitmap bitmap=new RenderTargetBitmap(720,480,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);
             PngBitmapEncoder encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));
@@ -748,7 +723,8 @@ namespace Tamago {
                 dc.DrawRectangle(Brush("#F4F1EA"),null,new Rect(0,0,720,480));
                 for(int row=0;row<2;row++) {
                     for(int col=0;col<3;col++) {
-                        BitmapSource frame=interactionSprites.AnimationFrames[row+1,col];
+                        PetInteraction kind=row==0?PetInteraction.Petted:PetInteraction.PlayYarn;
+                        BitmapSource frame=assets.Interaction(kind).At(profile.Interaction(kind).Duration*col/3.0,profile.Interaction(kind).Duration);
                         dc.DrawImage(frame,new Rect(col*240,row*240,240,240));
                     }
                 }
@@ -766,7 +742,7 @@ namespace Tamago {
             DrawingVisual visual=new DrawingVisual();
             using(DrawingContext dc=visual.RenderOpen()) {
                 dc.DrawRectangle(Brush("#F4F1EA"),null,new Rect(0,0,800,800));
-                for(int i=0;i<16;i++)dc.DrawImage(sprites.Frames[i],new Rect(i%4*200,i/4*200,200,200));
+                for(int i=0;i<8;i++)dc.DrawImage(assets.Action((PetAction)i).At(0,0),new Rect(i%4*200,i/4*200,200,200));
             }
             RenderTargetBitmap bitmap=new RenderTargetBitmap(800,800,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);
             PngBitmapEncoder encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using(FileStream s=File.Create(path))encoder.Save(s);

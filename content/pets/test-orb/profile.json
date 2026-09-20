@@ -1,0 +1,64 @@
+{
+  "characterName": "蓝豆",
+  "welcome": "你好，我是蓝豆！",
+  "companionSeconds": 8,
+  "actionLabels": {
+    "Idle": "蓝豆待机",
+    "WalkLeft": "向左散步",
+    "WalkRight": "向右散步",
+    "Run": "小跑一下",
+    "Sit": "乖乖坐好",
+    "Lie": "舒服地趴着",
+    "Sleep": "正在做美梦",
+    "Jump": "开心地跳跃"
+  },
+  "dialogue": [
+    "加油！\n你可以的！",
+    "要休息一下吗？\n(・ω・)",
+    "写得真棒！",
+    "又是高效的一天！\n(｡・ω・｡)",
+    "累了就放空吧～",
+    "有什么我可以\n帮你的吗？"
+  ],
+  "interactions": {
+    "Curious": {
+      "label": "发现了什么？",
+      "line": "咦？",
+      "duration": 2.7,
+      "ambient": true
+    },
+    "PlayYarn": {
+      "label": "玩毛线球",
+      "line": "抓到啦！",
+      "duration": 3.4,
+      "ambient": true
+    },
+    "Petted": {
+      "label": "蓝豆摸摸",
+      "line": "呼噜呼噜～",
+      "duration": 4,
+      "ambient": false
+    },
+    "Pout": {
+      "label": "有一点委屈",
+      "line": "再陪我一会儿嘛……",
+      "duration": 2.55,
+      "ambient": true
+    },
+    "Excited": {
+      "label": "兴奋起飞",
+      "line": "嘿咻！",
+      "duration": 2.0,
+      "ambient": true
+    }
+  },
+  "energy": {
+    "walkDrain": 3.2,
+    "runDrain": 9,
+    "idleDrain": 0.35,
+    "restRecover": 4.5,
+    "sleepRecover": 11,
+    "sleepAt": 24,
+    "wakeAt": 82
+  }
+}

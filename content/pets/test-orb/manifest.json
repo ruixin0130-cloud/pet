@@ -1,0 +1,701 @@
+{
+  "actions": {
+    "Idle": {
+      "frames": [
+        {
+          "time": 0.1,
+          "rect": [
+            0,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.14,
+          "rect": [
+            96,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.18,
+          "rect": [
+            192,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.22,
+          "rect": [
+            288,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.26,
+          "rect": [
+            384,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    },
+    "WalkLeft": {
+      "frames": [
+        {
+          "time": 0.1,
+          "rect": [
+            0,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.14,
+          "rect": [
+            96,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.18,
+          "rect": [
+            192,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.22,
+          "rect": [
+            288,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.26,
+          "rect": [
+            384,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    },
+    "WalkRight": {
+      "frames": [
+        {
+          "time": 0.1,
+          "rect": [
+            0,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.14,
+          "rect": [
+            96,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.18,
+          "rect": [
+            192,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.22,
+          "rect": [
+            288,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.26,
+          "rect": [
+            384,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    },
+    "Run": {
+      "frames": [
+        {
+          "time": 0.1,
+          "rect": [
+            0,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.14,
+          "rect": [
+            96,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.18,
+          "rect": [
+            192,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.22,
+          "rect": [
+            288,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.26,
+          "rect": [
+            384,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    },
+    "Sit": {
+      "frames": [
+        {
+          "time": 0.1,
+          "rect": [
+            0,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.14,
+          "rect": [
+            96,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.18,
+          "rect": [
+            192,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.22,
+          "rect": [
+            288,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.26,
+          "rect": [
+            384,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    },
+    "Lie": {
+      "frames": [
+        {
+          "time": 0.1,
+          "rect": [
+            0,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.14,
+          "rect": [
+            96,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.18,
+          "rect": [
+            192,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.22,
+          "rect": [
+            288,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.26,
+          "rect": [
+            384,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    },
+    "Sleep": {
+      "frames": [
+        {
+          "time": 0.1,
+          "rect": [
+            0,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.14,
+          "rect": [
+            96,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.18,
+          "rect": [
+            192,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.22,
+          "rect": [
+            288,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.26,
+          "rect": [
+            384,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    },
+    "Jump": {
+      "frames": [
+        {
+          "time": 0.1,
+          "rect": [
+            0,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.14,
+          "rect": [
+            96,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.18,
+          "rect": [
+            192,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.22,
+          "rect": [
+            288,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 0.26,
+          "rect": [
+            384,
+            0,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": true
+    }
+  },
+  "version": 1,
+  "interactions": {
+    "Curious": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            0,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 2,
+          "rect": [
+            96,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 3,
+          "rect": [
+            192,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 4,
+          "rect": [
+            288,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": false
+    },
+    "PlayYarn": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            0,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 2,
+          "rect": [
+            96,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 3,
+          "rect": [
+            192,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 4,
+          "rect": [
+            288,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": false
+    },
+    "Petted": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            0,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 2,
+          "rect": [
+            96,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 3,
+          "rect": [
+            192,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 4,
+          "rect": [
+            288,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": false
+    },
+    "Pout": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            0,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 2,
+          "rect": [
+            96,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 3,
+          "rect": [
+            192,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 4,
+          "rect": [
+            288,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": false
+    },
+    "Excited": {
+      "frames": [
+        {
+          "time": 1,
+          "rect": [
+            0,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 2,
+          "rect": [
+            96,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 3,
+          "rect": [
+            192,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        },
+        {
+          "time": 4,
+          "rect": [
+            288,
+            120,
+            96,
+            120
+          ],
+          "image": "orb"
+        }
+      ],
+      "facing": "right",
+      "mirror": true,
+      "loop": false
+    }
+  },
+  "images": {
+    "orb": "orb.png"
+  }
+}

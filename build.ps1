@@ -16,6 +16,8 @@ $petArgs = @(
     "/win32manifest:$petProject\src\app.manifest",
     "/win32icon:$petProject\assets\tamago-app-icon.ico",
     "/resource:$petProject\src\Panel.xaml,Panel.xaml",
+    "/resource:$petProject\content\pets\tamago\manifest.json,default-manifest.json",
+    "/resource:$petProject\content\pets\tamago\profile.json,default-profile.json",
     "/resource:$petProject\assets\tamago-sprites.png,tamago-sprites.png",
     "/resource:$petProject\assets\tamago-interactions.png,tamago-interactions.png",
     "/resource:$petProject\assets\tamago-interaction-animations.png,tamago-interaction-animations.png",
@@ -29,6 +31,8 @@ $petArgs = @(
     '/reference:System.Web.Extensions.dll',
     "$petProject\src\PetEngine.cs",
     "$petProject\src\PetProfile.cs",
+    "$petProject\src\PetAssets.cs",
+    "$petProject\src\PackTests.cs",
     "$petProject\src\Interaction.cs",
     "$petProject\src\App.cs",
     "$petProject\src\Tests.cs",
@@ -41,4 +45,9 @@ $petContentSource=Join-Path $petProject 'content\tamago-profile.json'
 $petBinContent=Join-Path $petBin 'content'
 New-Item -ItemType Directory -Force -Path $petBinContent | Out-Null
 Copy-Item -LiteralPath $petContentSource -Destination (Join-Path $petBinContent 'tamago-profile.json') -Force
+Copy-Item -Path (Join-Path $petProject 'content\*') -Destination $petBinContent -Recurse -Force
+if (-not (Test-Path -LiteralPath (Join-Path $petProject 'content\active-pet.json'))) {
+    $petBinSelection=Join-Path $petBinContent 'active-pet.json'
+    if (Test-Path -LiteralPath $petBinSelection) { Remove-Item -LiteralPath $petBinSelection }
+}
 Write-Host "Built: $petOutput"

@@ -7,30 +7,21 @@ namespace Tamago {
         static void Check(bool condition,string name) { if(!condition)throw new Exception(name);results.Add("PASS "+name); }
         static void TestInteractionState() {
             InteractionState state=new InteractionState();
-            Check(!state.Active&&state.Frame==-1,"interaction starts idle");
+            Check(!state.Active,"interaction starts idle");
             foreach(PetInteraction kind in Enum.GetValues(typeof(PetInteraction))) {
                 if(kind==PetInteraction.None)continue;
                 state.Start(kind);
-                Check(state.Active&&state.Frame==(int)kind-1&&state.Duration>0,"interaction starts "+kind);
+                Check(state.Active&&state.Duration>0,"interaction starts "+kind);
                 double before=state.Elapsed;state.Tick(.05,false);
                 Check(state.Elapsed>before&&state.Active,"interaction advances "+kind);
                 for(int i=0;i<50;i++)state.Tick(.1,false);
-                Check(!state.Active&&state.Frame==-1,"interaction ends "+kind);
+                Check(!state.Active,"interaction ends "+kind);
                 state.Start(kind);before=state.Elapsed;state.Tick(.1,true);
                 Check(state.Elapsed==before&&state.Active,"interaction pauses while blocked "+kind);
                 state.Clear();
             }
             state.Start(PetInteraction.PlayYarn);Check(state.Line.Contains("抓到"),"interaction includes a playful response");
             Check(InteractionState.LabelFor(PetInteraction.Petted)=="被摸摸了","interaction label is localized");
-            int[] animatedRows={1,2};
-            PetInteraction[] animatedKinds={PetInteraction.Petted,PetInteraction.PlayYarn};
-            for(int i=0;i<animatedKinds.Length;i++) {
-                state.Start(animatedKinds[i]);
-                Check(state.HasAnimation&&state.AnimationRow==animatedRows[i]&&state.AnimationFrame==0,"animated interaction starts on first frame "+animatedKinds[i]);
-                while(state.Elapsed<state.Duration*.5)state.Tick(.05,false);
-                Check(state.AnimationFrame==1,"animated interaction reaches middle frame "+animatedKinds[i]);
-            }
-            state.Start(PetInteraction.Curious);Check(!state.HasAnimation&&state.AnimationFrame==-1,"still interaction keeps its original frame");
         }
         static void TestGazeState() {
             GazeState gaze=new GazeState();
@@ -145,7 +136,7 @@ namespace Tamago {
                 e.X=0;e.SetAction(PetAction.WalkLeft,true);e.Tick(.1,area);Check(e.X==0&&e.Action==PetAction.WalkRight,"left boundary turns right");
                 e.X=area.Right-e.WindowWidth;e.SetAction(PetAction.WalkRight,true);e.Tick(.1,area);Check(e.Action==PetAction.WalkLeft,"right boundary turns left");
                 e.SetAction(PetAction.Run,true);e.X=0;e.FacingLeft=true;e.Tick(.1,area);Check(e.Action==PetAction.Run&&!e.FacingLeft,"running bounces without losing run state");
-                e.SetAction(PetAction.Sit,true);e.SetAction(PetAction.Jump,false);e.Tick(.1,area);Check(e.Lift>0&&e.Frame==15,"jump rises");
+                e.SetAction(PetAction.Sit,true);e.SetAction(PetAction.Jump,false);e.Tick(.1,area);Check(e.Lift>0&&e.Action==PetAction.Jump,"jump rises");
                 for(int i=0;i<9;i++)e.Tick(.1,area);Check(e.Action==PetAction.Sit&&e.Lift==0,"jump returns to previous action");
                 e.SetAction(PetAction.WalkLeft,true);e.Dragging=true;x=e.X;double elapsed=e.Elapsed;e.Tick(.1,area);
                 Check(e.X==x&&e.Elapsed==elapsed,"drag pauses movement and animation clock");e.Dragging=false;
@@ -169,7 +160,7 @@ namespace Tamago {
                 e.Energy=150;Check(e.Energy==100,"energy is capped at one hundred");e.Energy=-5;Check(e.Energy==0,"energy cannot be negative");e.Energy=double.NaN;Check(e.Energy==100,"invalid energy resets safely");
                 foreach(PetAction action in Enum.GetValues(typeof(PetAction))) {
                     e.SetAction(action,true);
-                    for(int i=0;i<70;i++){e.Tick(.1,area);Check(e.Frame>=0&&e.Frame<16,"valid frame "+action+" "+i);}
+                    for(int i=0;i<70;i++){e.Tick(.1,area);Check(!double.IsNaN(e.Elapsed)&&!double.IsInfinity(e.Lift),"valid animation clock "+action+" "+i);}
                 }
                 e.SetAutomatic(true);Check(e.Automatic,"automatic mode starts");
                 e.SetAction(PetAction.Sleep,true);Check(!e.Automatic,"manual action disables automatic override");
@@ -180,6 +171,7 @@ namespace Tamago {
                 s=PetSettings.Parse("<tamago size='NaN' speed='Infinity' x='Infinity' y='oops'/>");
                 Check(s.Size==170&&s.Speed==72&&double.IsNaN(s.X)&&double.IsNaN(s.Y),"invalid settings fall back safely");
                 s=PetSettings.Parse("this is not xml");Check(s.Size==170,"corrupt settings do not block startup");
+                PackTests.Run(Check);
                 TestProfile();
                 TestDialogue();
                 TestInteractionState();

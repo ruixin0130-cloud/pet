@@ -1,12 +1,91 @@
-# 玉子 · 桌面宠物 v0.7.0
+# 玉子 · 桌面宠物 v0.8.0
 
 参照用户提供的灰白猫咪设定图制作的 Windows 桌宠。采用原生 C# / WPF，猫咪直接悬浮在桌面上，背景透明；附带独立动作面板与托盘菜单。
 
-## 第七版：内容配置包
+## 本地角色素材包 V1
+
+同一个 EXE 可读取本地角色包，更换名字、文案、皮肤及现有动作的动画。修改后**退出托盘中的程序，再重新启动**；关面板只是收起，并非退出。此版本没有热切换、商店或新增动作类型。
+
+```text
+玉子桌宠.exe                 # 或 bin/Tamago.exe
+content/
+  active-pet.json
+  tamago-profile.json        # 无选择文件时的旧配置兼容入口
+  pets/
+    tamago/
+      profile.json
+      manifest.json
+      tamago-sprites.png
+      tamago-interactions.png
+      tamago-interaction-animations.png
+    test-orb/                # 蓝豆：用于验证的简易图形角色
+      profile.json
+      manifest.json
+      orb.png
+```
+
+修改**正在运行的 EXE 旁边**的 `content/active-pet.json`：
+
+```json
+{"pet":"test-orb"}
+```
+
+改成 `{"pet":"tamago"}` 恢复玉子。包 ID 只允许 1–64 个 ASCII 字母、数字、下划线和连字符。复制自己的目录到 `content/pets/<id>/` 后同样切换即可，不需要重新编译。构建会复制整个 `content` 到 `bin/content`；直接运行根目录 EXE 时使用根目录 `content`。运行期间改文件不会改变已缓存素材。
+
+`profile.json` 沿用 `PetProfile` 格式：`characterName`、`welcome`、`actionLabels`、六句 `dialogue`、`interactions`（label/line/duration/ambient）、`companionSeconds`、`energy`。面板、右键菜单和托盘使用当前名字及相关动作标签。合法 JSON 中缺省或超限的档案字段仍按旧规则使用字段默认值；坏 JSON 则导致整包回退。应用图标沿用玉子图标。
+
+### manifest.json 格式
+
+版本 `version` 必须为 `1`；`images` 将图片 ID 映射到包内 PNG 相对路径。`actions` 必须恰好包含 `Idle, WalkLeft, WalkRight, Run, Sit, Lie, Sleep, Jump`；`interactions` 必须恰好包含 `Curious, PlayYarn, Petted, Pout, Excited`。名称区分大小写。每个动作使用同一格式，例如下面是一个两帧基础动作条目（完整文件参考默认包）：
+
+```json
+{
+  "version": 1,
+  "images": {"body":"body.png"},
+  "actions": {
+    "WalkLeft": {
+      "facing":"right", "mirror":true, "loop":true,
+      "frames":[
+        {"image":"body", "rect":[0,0,96,120], "time":0.12},
+        {"image":"body", "rect":[96,0,96,120], "time":0.18}
+      ]
+    }
+  }
+}
+```
+
+- `rect` 为整数像素 `[x,y,width,height]`，以图片左上角为原点，宽高必须为正且完全位于图片内。帧可以重复、来自不同 PNG，帧数和图集布局自由。每个动作 1–128 帧，每帧 `time` 大于 0 且不超过 60。
+- 基础动作：`time` 单位为秒；`loop:true` 循环，`false` 在最后一帧停留，直到行为引擎切换动作。跳跃仍由原引擎在约 0.85 秒后结束；动画不改变运动或精力规则。
+- 互动动作：`loop` 必须为 `false`。`time` 是相对权重，整段序列缩放至 `profile.interactions.<name>.duration` 秒。例如四帧权重 `[1,2,3,4]`、duration=4，对应帧时长 `[0.4,0.8,1.2,1.6]`。拖拽等阻塞暂停互动计时；结束后回到基础动作。
+- `facing` 表示原图朝向，只能是 `left` / `right`；`mirror:true` 时，原图朝向与目标朝向不同时水平翻转。基础移动使用引擎朝向，静止时可跟随鼠标视线；无视线的静止动作默认目标为右。互动使用引擎保留的朝向。`mirror:false` 始终保持原图，不翻转文字、手掌等装饰。默认玉子互动均不镜像。
+- 可选 `touchedFrame` 是此动作 `frames` 的零基序号，用于非互动期间的短暂触摸余韵。玉子 Idle 配置了闭眼帧；通常可省略。
+- 默认玉子复用了原来的三张 PNG、不等距裁切、六秒待机眨眼，以及摸摸/毛线球的三帧序列。测试包蓝豆为五帧基础动作、四帧互动，使用两行五列的另一张图集和不等时序。
+
+### 校验与回退
+
+启动先加载并校验整个包，成功后一次性应用档案和冻结缓存的帧；渲染循环不读文件。选择文件损坏、不支持的版本、缺文件、坏 PNG、动作缺失、非法帧引用、越界矩形或非法时序都会**整包恢复内置玉子**，面板底部显示简短原因，不混用失败包的文案。内置素材、manifest 和 profile 嵌入 EXE，外部包损坏也能启动。
+
+图片路径限于包内：拒绝绝对路径、`..`、`.`、空路径段、盘符/备用数据流及符号链接/目录联接。最多 16 个 PNG，每文件不超过 32 MiB、边长不超过 8192、总像素不超过 3200 万；配置文件不超过 1 MiB。建议所有帧使用一致的画布尺寸与落脚点，避免缩放和位置抖动。
+
+**没有 `active-pet.json`** 时使用内置玉子素材，并读取旧的 `content/tamago-profile.json`；旧文件也没有时直接用内置档案。存在选择文件但指定包失败时整包回退，不读取旧档案。
+
+### Windows 回归验证
+
+运行 `powershell -ExecutionPolicy Bypass -File .\test.ps1`。除行为/气泡回归外，测试校验加载、五帧/四帧与不等时序、左右镜像、缓存、缺失/损坏/非法路径/越界回退、旧配置兼容；WPF 测试实际执行 `Refresh` 检查素材引用、动作按钮、面板/右键/托盘档案和回退提示。
+
+脚本复制同一 EXE 到隔离测试目录，只改变选择文件，分别重启测试包和缺失包，并比对 EXE 的 SHA-256。不会修改用户的源角色包或选择。结果位于 `output/engine-tests.txt`、`output/smoke-test.txt` 和 `output/pack-*-smoke.txt`。
+
+![默认玉子面板](docs/images/pack-tamago-panel.png)
+![蓝豆测试包面板](docs/images/pack-test-orb-panel.png)
+![失败回退提示](docs/images/pack-missing-package-panel.png)
+![默认包帧序列](docs/images/pack-tamago-frames.png)
+![五帧基础和四帧互动测试包](docs/images/pack-test-orb-frames.png)
+
+## 第七版：内容配置包（兼容）
 
 可执行文件旁新增 `content/tamago-profile.json`。角色名称、欢迎语、基础动作在状态栏和菜单中的名称、五个互动的台词和时长、自动互动候选、随机气泡、摸摸陪伴时长与精力节奏都可直接编辑，无需重新编译；修改后重启玉子即可生效。
 
-启动时会校验内容配置：缺少文件、JSON 损坏、气泡数量不完整、时长或精力阈值异常时，玉子会自动回退到内置默认内容，避免因改文案导致无法启动。当前贴图格位仍对应内置的基础动作和五个互动动作；新增贴图需要随后的动态素材包版本支持。
+旧配置仅在没有角色包选择文件时生效；新版本请编辑选中包的 `profile.json` 和 `manifest.json`。
 
 ## 第六版：精力与陪伴节奏
 
@@ -139,4 +218,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test.ps1
 
 已人工查看面板、全部动作帧与六句气泡的渲染截图。原生鼠标拖动手势、多显示器热插拔、不同屏幕缩放比例与长时间运行仍建议在实际使用中继续验证。
 
-第七版将角色文案、互动、气泡与精力节奏整理为内容配置包；第六版提供精力节奏与摸摸后的短暂陪伴，前一版提供两段多帧互动动画与本地鼠标感应。本项目不包含自由输入的 AI 对话、语音、联网功能或开机启动。猫咪为参考风格重新生成的角色素材，并非逐像素还原原图。
+第八版支持重启生效的本地角色素材包；第七版将角色文案、互动、气泡与精力节奏整理为内容配置包；第六版提供精力节奏与摸摸后的短暂陪伴，前一版提供两段多帧互动动画与本地鼠标感应。本项目不包含自由输入的 AI 对话、语音、联网功能或开机启动。猫咪为参考风格重新生成的角色素材，并非逐像素还原原图。

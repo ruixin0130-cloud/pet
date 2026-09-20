@@ -88,24 +88,6 @@ namespace Tamago {
             }
             Constrain(area);
         }
-        public int Frame {
-            get {
-                switch(Action) {
-                    case PetAction.WalkLeft: case PetAction.WalkRight: return 4+(int)(Elapsed*7)%4;
-                    case PetAction.Run: return 8+(int)(Elapsed*11)%4;
-                    case PetAction.Sit: return 12;
-                    case PetAction.Lie: return 13;
-                    case PetAction.Sleep: return 14;
-                    case PetAction.Jump: return 15;
-                    default:
-                        double t=Elapsed%6;
-                        if(t>5.55&&t<5.72) return 1;
-                        if(t>=5.72&&t<5.87) return 2;
-                        if(t>=5.87) return 1;
-                        return t>2.8&&t<4.3?3:0;
-                }
-            }
-        }
         public double Lift {
             get {
                 if(Action==PetAction.Jump) return Math.Sin(Math.Min(1,Elapsed/.85)*Math.PI)*72;

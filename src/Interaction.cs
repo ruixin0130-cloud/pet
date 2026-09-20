@@ -3,13 +3,11 @@ using System.Collections.ObjectModel;
 
 namespace Tamago {
     public enum PetInteraction {
-        // Keep the historical numeric slots so saved state and sprite indexes remain compatible.
+        // Preserve historical enum values; rendering uses names from the selected manifest.
         None=0, Curious=2, PlayYarn=3, Petted=4, Pout=6, Excited=8
     }
 
     public sealed class InteractionState {
-        // Yarn and petting each have a three-frame row in the v0.5 animation atlas.
-        static readonly int[] AnimationRows={-1,0,-1,2,1,-1,-1,-1,-1};
         // These are the little gestures Tamago can decide to play on her own.
         // "Petted" stays user initiated because it represents a real mouse touch.
         public static ReadOnlyCollection<PetInteraction> AmbientKinds { get { return PetProfile.Current.AmbientInteractions; } }
@@ -17,15 +15,6 @@ namespace Tamago {
         public double Elapsed { get; private set; }
         public bool Active { get { return Kind!=PetInteraction.None; } }
         public double Duration { get { return Active?PetProfile.Current.Interaction(Kind).Duration:0; } }
-        public int Frame { get { return Active?(int)Kind-1:-1; } }
-        public bool HasAnimation { get { return Active&&AnimationRows[(int)Kind]>=0; } }
-        public int AnimationRow { get { return HasAnimation?AnimationRows[(int)Kind]:-1; } }
-        public int AnimationFrame {
-            get {
-                if(!HasAnimation)return -1;
-                return Math.Min(2,(int)(Elapsed/(Duration/3)));
-            }
-        }
         public string Label { get { return Active?PetProfile.Current.Interaction(Kind).Label:""; } }
         public string Line { get { return Active?PetProfile.Current.Interaction(Kind).Line:""; } }
         public static string LabelFor(PetInteraction kind) { return kind==PetInteraction.None?"":PetProfile.Current.Interaction(kind).Label; }
@@ -99,7 +88,7 @@ namespace Tamago {
             if(busy){Postpone(now);return PetInteraction.None;}
             if(now<nextDue)return PetInteraction.None;
             PetInteraction chosen=InteractionState.AmbientKinds[random.Next(InteractionState.AmbientKinds.Count)];
-            if(chosen==previous) {
+            if(chosen==previous&&InteractionState.AmbientKinds.Count>1) {
                 int offset=1+random.Next(InteractionState.AmbientKinds.Count-1);
                 chosen=InteractionState.AmbientKinds[(InteractionState.AmbientKinds.IndexOf(chosen)+offset)%InteractionState.AmbientKinds.Count];
             }
