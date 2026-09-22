@@ -218,6 +218,7 @@ namespace Tamago {
                 s=PetSettings.Parse("this is not xml");Check(s.Size==170,"corrupt settings do not block startup");
                 PackTests.Run(Check);
                 TestLifeState();
+                StudyTests.Run(Check);
                 TestProfile();
                 TestDialogue();
                 TestInteractionState();

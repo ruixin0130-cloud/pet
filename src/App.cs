@@ -15,8 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.9.0.0")]
-[assembly: AssemblyFileVersion("0.9.0.0")]
+[assembly: AssemblyVersion("0.10.0.0")]
+[assembly: AssemblyFileVersion("0.10.0.0")]
 
 namespace Tamago {
     static class Program {
@@ -44,10 +44,20 @@ namespace Tamago {
         [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr handle);
         public static readonly uint ShowMessage=RegisterWindowMessage("Tamago.DesktopPet.Show.v01");
     }
-    public sealed class PetApp : Application {
+    public sealed partial class PetApp : Application {
         readonly bool smoke;
         readonly PetEngine engine=new PetEngine();
         PetLifeState life=new PetLifeState();
+        StudyState study=new StudyState();
+        StudySession studyReminder;
+        double studyReminderUntil,studyRetryAt;
+        string studyError;
+        bool studyLoadFailed;
+        MenuItem studyMenu,studyRemaining,studyToday,studyEnd,studyWarning;
+        readonly List<MenuItem> studyChoices=new List<MenuItem>();
+        readonly List<MenuItem> studyBlockedItems=new List<MenuItem>();
+        bool StudyBusy { get { return study.Active!=null||studyReminder!=null; } }
+        string StudyFile { get { return Path.Combine(Path.GetDirectoryName(SettingsFile),"study.xml"); } }
         DialogueScheduler dialogue;
         readonly InteractionScheduler ambientInteractions=new InteractionScheduler();
         readonly InteractionState interaction=new InteractionState();
@@ -114,6 +124,14 @@ namespace Tamago {
             panel.Show();
             if(!smoke) CreateTray();
             Say(profile.Welcome,5);
+            if(!smoke) {
+                try { study=StudyStore.Load(StudyFile); }
+                catch(Exception error) {
+                    if(!StudyStorageError(error))throw;
+                    studyLoadFailed=true;studyError="学习记录无法读取，请备份并检查 study.xml";
+                }
+                if(study.Active!=null) { EnterStudy();AdvanceStudy(DateTimeOffset.Now); }
+            }
             timer=new DispatcherTimer(DispatcherPriority.Render);
             timer.Interval=TimeSpan.FromMilliseconds(33); timer.Tick+=Tick;
             previousTime=clock.Elapsed.TotalSeconds; timer.Start();
@@ -239,6 +257,24 @@ namespace Tamago {
             }
             menu.Items.Add(new Separator());AddItem(menu,"自由活动",delegate {SetAutomaticMode(true,true);});
             AddItem(menu,"找回"+profile.CharacterName,Home);AddItem(menu,"退出"+profile.CharacterName,Quit);
+            for(int index=1;index<menu.Items.Count-2;index++) {
+                MenuItem item=menu.Items[index] as MenuItem;
+                if(item!=null)studyBlockedItems.Add(item);
+            }
+            menu.Items.Add(new Separator());
+            studyMenu=new MenuItem {Header="陪我学习"};menu.Items.Add(studyMenu);
+            foreach(int minutes in new int[] {25,45,60}) {
+                int duration=minutes;
+                MenuItem choice=new MenuItem {Header=minutes+" 分钟"};
+                choice.Click+=delegate { StartStudy(duration,DateTimeOffset.Now); };
+                studyChoices.Add(choice);studyMenu.Items.Add(choice);
+            }
+            studyRemaining=new MenuItem {IsEnabled=false};studyMenu.Items.Add(studyRemaining);
+            studyEnd=new MenuItem {Header="提前结束"};
+            studyEnd.Click+=delegate { EndStudy(DateTimeOffset.Now,true); };studyMenu.Items.Add(studyEnd);
+            studyToday=new MenuItem {IsEnabled=false};menu.Items.Add(studyToday);
+            studyWarning=new MenuItem {IsEnabled=false};menu.Items.Add(studyWarning);
+            menu.Opened+=delegate { RefreshStudy(DateTimeOffset.Now); };
             menu.Opened+=delegate { engine.Dragging=true; };
             menu.Closed+=delegate { engine.Dragging=false; };
             pet.ContextMenu=menu;
@@ -290,7 +326,7 @@ namespace Tamago {
         }
         void MouseDown(object sender,MouseButtonEventArgs e) {
             if(e.ChangedButton!=MouseButton.Left)return;
-            if(e.ClickCount==2){engine.SetAction(PetAction.Jump,false);suppressClick=true;Say("嘿咻！",1.3);e.Handled=true;return;}
+            if(e.ClickCount==2&&!StudyBusy){engine.SetAction(PetAction.Jump,false);suppressClick=true;Say("嘿咻！",1.3);e.Handled=true;return;}
             suppressClick=false;pressed=true;moved=false;dragStart=CursorPosition();windowStart=new Point(engine.X,engine.Y);
             engine.Dragging=true;pet.CaptureMouse();e.Handled=true;
         }
@@ -308,7 +344,7 @@ namespace Tamago {
                 petUntil=clock.Elapsed.TotalSeconds+2;
                 if(engine.Action==PetAction.Sleep)engine.SetAction(PetAction.Idle,false);
                 TriggerInteraction(PetInteraction.Petted,false);
-                Say(profile.Interaction(PetInteraction.Petted).Line,Math.Min(2,interaction.Duration));
+                if(!StudyBusy)Say(profile.Interaction(PetInteraction.Petted).Line,Math.Min(2,interaction.Duration));
             }
             else interaction.Clear();
             engine.Constrain(WorkArea());ApplyLayout();Save();
@@ -324,10 +360,14 @@ namespace Tamago {
             double centerX=engine.X+engine.WindowWidth/2;
             double centerY=engine.Y+100+engine.Size*.48;
             double radius=Math.Max(120,engine.Size*1.18);
-            bool blocked=pressed||engine.Dragging||interaction.Active||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||IsMoving();
+            bool blocked=StudyBusy||pressed||engine.Dragging||interaction.Active||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||IsMoving();
             gaze.Update(cursor.X,cursor.Y,centerX,centerY,radius,blocked);
         }
         void TriggerInteraction(PetInteraction kind,bool manual) {
+            if(StudyBusy) {
+                if(kind==PetInteraction.Petted) {petUntil=clock.Elapsed.TotalSeconds+2;life.Record(LifeEvent.Petted,profile.CompanionSeconds);}
+                return;
+            }
             if(kind==PetInteraction.None)return;
             interactionResumePending=false;
             if(manual && kind!=PetInteraction.Petted) {
@@ -357,6 +397,7 @@ namespace Tamago {
             Refresh();Save();
         }
         void SetAutomaticMode(bool enabled,bool announce) {
+            if(StudyBusy)return;
             engine.SetAutomatic(enabled);
             ambientInteractions.SetEnabled(enabled,clock.Elapsed.TotalSeconds);
             companionUntil=0;
@@ -368,6 +409,7 @@ namespace Tamago {
             Refresh();Save();
         }
         void ChangeAction(PetAction action) {
+            if(StudyBusy)return;
             interaction.Clear();
             interactionResumePending=false;
             companionUntil=0;engine.ClearAutomaticHold();
@@ -382,9 +424,10 @@ namespace Tamago {
             // Use the primary work area so recovery is predictable even after a display is disconnected.
             Rect rect=SystemParameters.WorkArea;
             engine.X=rect.Right-engine.WindowWidth-70;engine.Y=rect.Bottom-engine.WindowHeight;
-            companionUntil=0;engine.ClearAutomaticHold();
-            engine.SetAction(PetAction.Idle,false);engine.Constrain(new Area(rect.Left,rect.Top,rect.Width,rect.Height));
-            pet.Show();ApplyLayout();Say("我在这儿！",2.5);Save();
+            companionUntil=0;if(!StudyBusy)engine.ClearAutomaticHold();
+            if(!StudyBusy)engine.SetAction(PetAction.Idle,false);
+            engine.Constrain(new Area(rect.Left,rect.Top,rect.Width,rect.Height));
+            pet.Show();ApplyLayout();if(!StudyBusy)Say("我在这儿！",2.5);Save();
         }
         void SetRandomSpeech(bool enabled) {
             if(!initialized)return;
@@ -393,18 +436,19 @@ namespace Tamago {
             Refresh();Save();
         }
         void SpeakNow() {
+            if(StudyBusy)return;
             if(engine.Action==PetAction.Sleep)engine.SetAction(PetAction.Idle,false);
             double now=clock.Elapsed.TotalSeconds;
             SayAt(dialogue.SpeakNow(now),DialogueScheduler.DisplaySeconds,true,now);
             Refresh();
         }
         void AdvanceDialogue(double now) {
-            bool busy=engine.Dragging||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||interaction.Active||now<bubbleUntil||now<petUntil||now<companionUntil;
+            bool busy=StudyBusy||engine.Dragging||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||interaction.Active||now<bubbleUntil||now<petUntil||now<companionUntil;
             string line=dialogue.TryNext(now,busy);
             if(line!=null)SayAt(line,DialogueScheduler.DisplaySeconds,true,now);
         }
         void AdvanceAmbientInteraction(double now) {
-            bool busy=!engine.Automatic||engine.Dragging||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||
+            bool busy=StudyBusy||!engine.Automatic||engine.Dragging||engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||
                 interaction.Active||now<bubbleUntil||now<petUntil||now<companionUntil||IsMoving()||gaze.Active;
             PetInteraction next=ambientInteractions.TryNext(now,busy);
             if(next!=PetInteraction.None)TriggerInteraction(next,false);
@@ -423,7 +467,8 @@ namespace Tamago {
             double fadeOut=Math.Max(0,Math.Min(1,(bubbleUntil-now)/.6));
             bubbleHost.Opacity=previewBubble.Opacity=visible?Math.Min(fadeIn,fadeOut):0;
             bubbleShift.Y=4*(1-fadeIn);
-            speechHint.Text=dialogue.Enabled?"每 30–60 秒，送来一句小小的鼓励":"随机聊天已暂停，仍可点击「说一句」";
+            speechHint.Text=studyReminder!=null?"学习完成 · 休息一下，稍后恢复活动":(study.Active!=null?
+                "学习陪伴中 · 暂停聊天，右键可查看或提前结束":(dialogue.Enabled?"每 30–60 秒，送来一句小小的鼓励":"随机聊天已暂停，仍可点击「说一句」"));
         }
         void ApplyLayout() {
             pet.Width=engine.WindowWidth;pet.Height=engine.WindowHeight;
@@ -439,6 +484,7 @@ namespace Tamago {
         }
         void Tick(object sender,EventArgs args) {
             double now=clock.Elapsed.TotalSeconds,dt=now-previousTime;previousTime=now;
+            AdvanceStudy(DateTimeOffset.Now);
             engine.Tick(dt,WorkArea());
             life.Observe(engine.Dragging?0:dt,engine.Energy,engine.Action);
             bool interactionWasActive=interaction.Active;
@@ -454,7 +500,7 @@ namespace Tamago {
         }
         void ApplyLifeSuggestion() {
             LifeSnapshot current=life.Snapshot;
-            if(!engine.Automatic||engine.Dragging||interaction.Active||
+            if(StudyBusy||!engine.Automatic||engine.Dragging||interaction.Active||
                 engine.Action==PetAction.Sleep||engine.Action==PetAction.Jump||!current.SuggestedAction.HasValue)return;
             PetAction suggested=current.SuggestedAction.Value;
             if(engine.Action!=suggested)engine.SetAction(suggested,false);
@@ -491,20 +537,25 @@ namespace Tamago {
             bool companion=now<companionUntil;
             status.Text=interaction.Active?"● "+interaction.Label:(companion?"● 陪你一会儿":(looking?"● 正在看着你":"● "+engine.Label));
             mode.Text=interaction.Active?"互动中":(companion?"陪伴中":(looking?"注意到你了":(engine.Automatic?"自由活动中":"听你的安排")));
+            if(StudyBusy) {status.Text=study.Active!=null?"● 安静陪你学习":"● 学习完成，休息一下";mode.Text="学习陪伴";}
+            RefreshStudy(DateTimeOffset.Now);
             sizeValue.Text=((int)engine.Size)+" px";speedValue.Text=engine.Speed<55?"慢悠悠":engine.Speed>110?"轻快":"悠闲";
             foreach(KeyValuePair<PetAction,Button> item in actionButtons) {
                 bool selected=!engine.Automatic&&engine.Action==item.Key;
                 item.Value.Background=Brush(selected?"#EDF0E5":"#FFFFFF");
                 item.Value.BorderBrush=Brush(selected?"#A2AE91":"#E8E5DC");
+                item.Value.IsEnabled=!StudyBusy;
             }
             autoButton.Background=Brush(engine.Automatic?"#E1E8D5":"#FFFFFF");
             autoButton.BorderBrush=Brush(engine.Automatic?"#98A487":"#E8E5DC");
+            autoButton.IsEnabled=!StudyBusy;Find<Button>("SpeakNow").IsEnabled=!StudyBusy;
             energyBar.Value=engine.Energy;energyValue.Text=((int)Math.Round(engine.Energy))+"%";
             lifeStateValue.Text="状态 · "+LifeLabel(life.Snapshot.State);
             foreach(KeyValuePair<PetInteraction,Button> item in interactionButtons) {
                 bool selected=interaction.Active&&interaction.Kind==item.Key;
                 item.Value.Background=Brush(selected?"#F9EDEA":"#FFFFFF");
                 item.Value.BorderBrush=Brush(selected?"#D7A9A3":"#E8E5DC");
+                item.Value.IsEnabled=!StudyBusy||item.Key==PetInteraction.Petted;
             }
         }
         void Save() {
@@ -577,6 +628,7 @@ namespace Tamago {
                 engine.SetAction(PetAction.Idle,false);engine.Automatic=true;Refresh();ApplyLayout();
                 TestInteractionUi(checks);
                 TestLifeUi(checks,output);
+                TestStudyUi(checks,output);
                 CaptureInteractionSheet(Path.Combine(output,"interaction-preview.png"));
                 CaptureInteractionAnimationSheet(Path.Combine(output,"interaction-animation-preview.png"));
                 TestGazeUi(checks);

@@ -19,6 +19,7 @@ namespace Tamago {
         PetAction resume = PetAction.Idle;
         public double X, Y, Size=170, Speed=72, Elapsed;
         public bool Automatic=true, FacingLeft, Dragging;
+        public bool Studying;
         public PetAction Action=PetAction.Idle;
         public double Energy {
             get { return energy; }
@@ -53,6 +54,10 @@ namespace Tamago {
         public void Tick(double dt, Area area) {
             if(double.IsNaN(dt) || double.IsInfinity(dt) || dt<0) return;
             dt=Math.Min(dt,0.1);
+            if(Studying) {
+                PetAction quiet=Energy<=PetProfile.Current.Energy.SleepAt?PetAction.Lie:PetAction.Sit;
+                if(Action!=quiet)SetAction(quiet,false);
+            }
             if(Dragging) return;
             Elapsed+=dt; autoElapsed+=dt;
             automaticPause=Math.Max(0,automaticPause-dt);
@@ -65,11 +70,11 @@ namespace Tamago {
             else energyRate=-energyProfile.IdleDrain;
             Energy+=energyRate*dt;
             if(Action==PetAction.Jump && Elapsed>=0.85) SetAction(resume,false);
-            if(Automatic && automaticPause<=0 && Action!=PetAction.Jump && Action!=PetAction.Sleep && Energy<=energyProfile.SleepAt) {
+            if(!Studying && Automatic && automaticPause<=0 && Action!=PetAction.Jump && Action!=PetAction.Sleep && Energy<=energyProfile.SleepAt) {
                 SetAction(PetAction.Sleep,false);nextAuto=28;
-            } else if(Automatic && automaticPause<=0 && Action==PetAction.Sleep && Energy>=energyProfile.WakeAt) {
+            } else if(!Studying && Automatic && automaticPause<=0 && Action==PetAction.Sleep && Energy>=energyProfile.WakeAt) {
                 SetAction(PetAction.Idle,false);nextAuto=5;
-            } else if(Automatic && automaticPause<=0 && autoElapsed>=nextAuto && Action!=PetAction.Jump && Action!=PetAction.Sleep) {
+            } else if(!Studying && Automatic && automaticPause<=0 && autoElapsed>=nextAuto && Action!=PetAction.Jump && Action!=PetAction.Sleep) {
                 PetAction[] choices={PetAction.Idle,PetAction.WalkLeft,PetAction.WalkRight,PetAction.Sit,PetAction.Lie,PetAction.Sleep};
                 SetAction(choices[random.Next(choices.Length)],false);
                 nextAuto=Action==PetAction.Sleep?22:7+random.Next(8);
