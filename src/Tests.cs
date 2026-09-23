@@ -219,6 +219,7 @@ namespace Tamago {
                 PackTests.Run(Check);
                 TestLifeState();
                 StudyTests.Run(Check);
+                AgentRuntimeTests.Run(Check);
                 TestProfile();
                 TestDialogue();
                 TestInteractionState();

@@ -2,6 +2,16 @@
 
 参照用户提供的灰白猫咪设定图制作的 Windows 桌宠。采用原生 C# / WPF，猫咪直接悬浮在桌面上，背景透明；附带独立动作面板与托盘菜单。
 
+## Agent Runtime V1
+
+`AgentRuntime.RunAsync(AgentRequest, CancellationToken)` 提供一次按需请求的完整循环：读取 `IAgentPetPort` 快照 → 将快照与工具定义交给 `IAgentModelAdapter` → 接收明确的 `ModelDecision.Final(...)` 或 `ModelDecision.Call(...)` → 校验并执行工具 → 重新读取状态，将结构化结果反馈给适配器 → 返回 `AgentRunResult`。最终回复只返回给调用方；只有模型显式调用 `speak` 才会显示宠物气泡。当前程序没有实例化模型适配器，也没有自动触发请求或聊天界面。
+
+`AgentToolRouter` 固定公开 `set_action`、`play_interaction`、`speak`、`set_automatic`、`start_study`、`end_study` 六种工具。每项都有 JSON 参数描述，Router 在调用 Port 前再次校验名称、参数类型、取值和请求级允许名单；模型无法通过工具名触及 UI、动画或底层字段。`play_interaction` 不允许伪造 `Petted`。调用方可以通过 `AgentRequest.AllowedTools` 缩小一次请求的工具范围；不指定时公开全部六项。
+
+每次只处理一个请求；每次请求最多 4 轮模型决策、3 次串行工具调用。模型决策的总时间预算默认 30 秒，状态读取和一次 Port 调用默认分别限时 5 秒。`Busy`、学习存储失败等结果会反馈给模型，但不再执行新的工具；最终回复会用确定的失败文案，避免模型误报成功。非法工具调用可在剩余调用额度内纠正一次。已经提交的 Port 指令不会因请求取消而重试；若超过 Port 等待时间，结果标为 `ExecutionUnknown`，提示用户核对实际状态。
+
+实现位于 `src/AgentRuntimeContracts.cs`、`src/AgentToolRouter.cs` 和 `src/AgentRuntime.cs`。`src/AgentRuntimeTests.cs` 用假模型和假 Port 覆盖成功闭环、上限、忙碌、非法调用、存储失败、超时、取消及并发请求；`test.ps1` 仍运行原有 WPF 和角色包回归。本版不接真实模型或聊天 UI，也不保存对话历史。
+
 ## Agent Ready V1
 
 `IAgentPetPort` 是未来进程内 Agent 的唯一桌宠入口。`ReadAsync()` 返回一次性、不可修改的 `PetAgentSnapshot`：角色名、动作、生命状态、精力、自由活动和随机聊天开关、拖动/互动/陪伴、当前气泡，以及学习阶段、剩余时间和今日统计。接口不提供 WPF 控件、动画帧、`PetEngine` 或可写的底层状态。跨线程调用会切回 WPF Dispatcher，快照和指令都在 UI 线程读取或执行。
