@@ -21,11 +21,13 @@ namespace Tamago {
                 return false;
             }
         }
-        void StartStudy(int minutes,DateTimeOffset now) {
-            if(StudyBusy||studyLoadFailed)return;
+        bool StartStudy(int minutes,DateTimeOffset now) {
+            if(StudyBusy||studyLoadFailed)return false;
             StudyState candidate=study.Copy();
-            if(candidate.Start(minutes,now,engine)&&CommitStudy(candidate))EnterStudy();
+            bool started=candidate.Start(minutes,now,engine)&&CommitStudy(candidate);
+            if(started)EnterStudy();
             Refresh();Save();
+            return started;
         }
         void EnterStudy() {
             interaction.Clear();interactionResumePending=false;
@@ -37,13 +39,13 @@ namespace Tamago {
             ambientInteractions.Postpone(clock.Elapsed.TotalSeconds+5);
             UpdateGaze();Refresh();
         }
-        void EndStudy(DateTimeOffset now,bool early) {
-            if(study.Active==null)return;
+        bool EndStudy(DateTimeOffset now,bool early) {
+            if(study.Active==null)return false;
             // A click at/after the deadline completes the session, never discards earned credit.
             early=early&&now<study.Active.Deadline;
             StudyState candidate=study.Copy();
             StudySession finished=candidate.Finish(now,early);
-            if(finished==null||!CommitStudy(candidate))return;
+            if(finished==null||!CommitStudy(candidate))return false;
             engine.Studying=false;
             if(early)RestoreStudyBehavior(finished);
             else {
@@ -53,6 +55,7 @@ namespace Tamago {
                 Say("完成 "+finished.Minutes+" 分钟学习啦！\n起来走走，休息一下吧～",6);
             }
             Refresh();Save();
+            return true;
         }
         void RestoreStudyBehavior(StudySession finished) {
             studyReminder=null;engine.Studying=false;

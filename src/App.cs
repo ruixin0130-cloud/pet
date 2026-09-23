@@ -629,6 +629,7 @@ namespace Tamago {
                 TestInteractionUi(checks);
                 TestLifeUi(checks,output);
                 TestStudyUi(checks,output);
+                TestAgentPort(checks);
                 CaptureInteractionSheet(Path.Combine(output,"interaction-preview.png"));
                 CaptureInteractionAnimationSheet(Path.Combine(output,"interaction-animation-preview.png"));
                 TestGazeUi(checks);

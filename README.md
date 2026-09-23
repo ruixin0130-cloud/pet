@@ -2,6 +2,14 @@
 
 参照用户提供的灰白猫咪设定图制作的 Windows 桌宠。采用原生 C# / WPF，猫咪直接悬浮在桌面上，背景透明；附带独立动作面板与托盘菜单。
 
+## Agent Ready V1
+
+`IAgentPetPort` 是未来进程内 Agent 的唯一桌宠入口。`ReadAsync()` 返回一次性、不可修改的 `PetAgentSnapshot`：角色名、动作、生命状态、精力、自由活动和随机聊天开关、拖动/互动/陪伴、当前气泡，以及学习阶段、剩余时间和今日统计。接口不提供 WPF 控件、动画帧、`PetEngine` 或可写的底层状态。跨线程调用会切回 WPF Dispatcher，快照和指令都在 UI 线程读取或执行。
+
+受控指令为 `SetActionAsync`、`PlayInteractionAsync`、`SpeakAsync`、`SetAutomaticAsync`、`StartStudyAsync` 和 `EndStudyAsync`，统一返回 `AgentCommandResult.Code`（`Applied`、`Busy`、`InvalidArgument`、`InvalidState`、`StorageUnavailable`、`ShuttingDown`）。动作选择与现有手动选动作一致，会关闭自由活动；互动保留自由活动设置。`Petted` 只代表真实用户触摸，Agent 不可触发。自定义气泡最多 80 字、两行，显示 6 秒；V1 不控制体型、速度、位置、置顶或随机聊天开关。
+
+用户拖动、现有互动、摸摸陪伴、显示中的气泡和学习完成提醒优先；Agent 指令遇到这些状态返回 `Busy`，不自动排队。学习进行中只允许结束学习；学习读写失败会报告 `StorageUnavailable`，不绕过原有保存规则。接口定义在 `src/AgentContracts.cs`，WPF 线程切换、快照组合与命令校验在 `src/AgentPort.cs`；实际行为继续走 `PetApp` 与 `StudyApp` 的现有入口。本版不接模型、不提供聊天 UI 或进程通信。
+
 ## 学习陪伴模式 V1
 
 右键玉子 → **陪我学习** → 选择 **25、45 或 60 分钟**。菜单实时显示剩余分秒和今日已完成次数、累计分钟；同一子菜单可选择**提前结束**。一次只能进行一段学习。
