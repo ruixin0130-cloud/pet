@@ -2,15 +2,30 @@
 
 参照用户提供的灰白猫咪设定图制作的 Windows 桌宠。采用原生 C# / WPF，猫咪直接悬浮在桌面上，背景透明；附带独立动作面板与托盘菜单。
 
+## Qwen Model Adapter V1
+
+`QwenModelAdapter` 把现有 `IAgentModelAdapter` 接到阿里云百炼北京地域的 `qwen3.8-flash` Chat Completions 接口。每轮只发送当前请求、桌宠快照、工具反馈和 Runtime 允许的工具；模型返回的单个工具调用交由 `AgentRuntime` 和 `AgentToolRouter` 校验、执行。适配器不保存跨请求对话，也不接入聊天界面。请求关闭思考和并行工具调用，以适配 V1 的时限与串行调用契约。
+
+API Key 只从运行进程的 `DASHSCOPE_API_KEY` 环境变量读取。请在 Windows 环境变量设置北京地域的百炼 API Key，重新打开终端后执行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
+$run = Start-Process -FilePath .\bin\Tamago.exe -ArgumentList '--qwen-agent-smoke' -PassThru -Wait
+Get-Content .\output\qwen-agent-smoke.txt
+$run.ExitCode
+```
+
+此显式联调模式用独立桌宠实例执行一次固定的 `set_action(Sit)` 请求，检查工具结果和模型最终回复，随后自动退出；不读写日常设置或学习记录。报告位于被 Git 忽略的 `output/qwen-agent-smoke.txt`，不包含 API Key。若没有配置 Key，联调在发起网络请求前失败。普通启动不会请求模型。自动测试使用假 HTTP 响应，不消耗真实 API 调用。
+
 ## Agent Runtime V1
 
-`AgentRuntime.RunAsync(AgentRequest, CancellationToken)` 提供一次按需请求的完整循环：读取 `IAgentPetPort` 快照 → 将快照与工具定义交给 `IAgentModelAdapter` → 接收明确的 `ModelDecision.Final(...)` 或 `ModelDecision.Call(...)` → 校验并执行工具 → 重新读取状态，将结构化结果反馈给适配器 → 返回 `AgentRunResult`。最终回复只返回给调用方；只有模型显式调用 `speak` 才会显示宠物气泡。当前程序没有实例化模型适配器，也没有自动触发请求或聊天界面。
+`AgentRuntime.RunAsync(AgentRequest, CancellationToken)` 提供一次按需请求的完整循环：读取 `IAgentPetPort` 快照 → 将快照与工具定义交给 `IAgentModelAdapter` → 接收明确的 `ModelDecision.Final(...)` 或 `ModelDecision.Call(...)` → 校验并执行工具 → 重新读取状态，将结构化结果反馈给适配器 → 返回 `AgentRunResult`。最终回复只返回给调用方；只有模型显式调用 `speak` 才会显示宠物气泡。普通启动不会实例化模型适配器，也没有自动触发请求或聊天界面。
 
 `AgentToolRouter` 固定公开 `set_action`、`play_interaction`、`speak`、`set_automatic`、`start_study`、`end_study` 六种工具。每项都有 JSON 参数描述，Router 在调用 Port 前再次校验名称、参数类型、取值和请求级允许名单；模型无法通过工具名触及 UI、动画或底层字段。`play_interaction` 不允许伪造 `Petted`。调用方可以通过 `AgentRequest.AllowedTools` 缩小一次请求的工具范围；不指定时公开全部六项。
 
 每次只处理一个请求；每次请求最多 4 轮模型决策、3 次串行工具调用。模型决策的总时间预算默认 30 秒，状态读取和一次 Port 调用默认分别限时 5 秒。`Busy`、学习存储失败等结果会反馈给模型，但不再执行新的工具；最终回复会用确定的失败文案，避免模型误报成功。非法工具调用可在剩余调用额度内纠正一次。已经提交的 Port 指令不会因请求取消而重试；若超过 Port 等待时间，结果标为 `ExecutionUnknown`，提示用户核对实际状态。
 
-实现位于 `src/AgentRuntimeContracts.cs`、`src/AgentToolRouter.cs` 和 `src/AgentRuntime.cs`。`src/AgentRuntimeTests.cs` 用假模型和假 Port 覆盖成功闭环、上限、忙碌、非法调用、存储失败、超时、取消及并发请求；`test.ps1` 仍运行原有 WPF 和角色包回归。本版不接真实模型或聊天 UI，也不保存对话历史。
+实现位于 `src/AgentRuntimeContracts.cs`、`src/AgentToolRouter.cs` 和 `src/AgentRuntime.cs`。`src/AgentRuntimeTests.cs` 用假模型和假 Port 覆盖成功闭环、上限、忙碌、非法调用、存储失败、超时、取消及并发请求；`test.ps1` 仍运行原有 WPF 和角色包回归。Runtime 不绑定具体模型或聊天 UI，也不保存对话历史。
 
 ## Agent Ready V1
 

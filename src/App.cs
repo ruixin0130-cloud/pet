@@ -23,13 +23,18 @@ namespace Tamago {
         [STAThread] static int Main(string[] args) {
             bool test=Array.IndexOf(args,"--self-test")>=0;
             bool smoke=Array.IndexOf(args,"--smoke-test")>=0;
+            bool qwenSmoke=Array.IndexOf(args,"--qwen-agent-smoke")>=0;
             if(test) return Tests.Run();
             bool first;
             using(Mutex instance=new Mutex(true,"Local.Tamago.DesktopPet.v01",out first)) {
-                if(!first&&!smoke) { Native.PostMessage(new IntPtr(0xffff),Native.ShowMessage,IntPtr.Zero,IntPtr.Zero); return 0; }
-                try { return new PetApp(smoke).Run(); }
+                if(!first&&!smoke&&!qwenSmoke) { Native.PostMessage(new IntPtr(0xffff),Native.ShowMessage,IntPtr.Zero,IntPtr.Zero); return 0; }
+                try { return new PetApp(smoke||qwenSmoke,qwenSmoke).Run(); }
                 catch(Exception e) {
-                    if(smoke) File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"smoke-error.txt"),e.ToString());
+                    if(qwenSmoke) {
+                        string output=Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"..","output"));
+                        Directory.CreateDirectory(output);
+                        File.WriteAllText(Path.Combine(output,"qwen-agent-smoke.txt"),"FAIL startup: "+e.GetType().Name);
+                    } else if(smoke) File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"smoke-error.txt"),e.ToString());
                     else MessageBox.Show("玉子暂时没能启动。\n\n"+e.Message,"玉子",MessageBoxButton.OK,MessageBoxImage.Information);
                     return 1;
                 }
@@ -46,6 +51,7 @@ namespace Tamago {
     }
     public sealed partial class PetApp : Application {
         readonly bool smoke;
+        readonly bool qwenSmoke;
         readonly PetEngine engine=new PetEngine();
         PetLifeState life=new PetLifeState();
         StudyState study=new StudyState();
@@ -98,7 +104,9 @@ namespace Tamago {
         string lastSettings;
         string SettingsFile { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"TamagoPet","settings.xml"); } }
         PetProfile profile=PetProfile.Current;
-        public PetApp(bool isSmoke) { smoke=isSmoke; ShutdownMode=ShutdownMode.OnExplicitShutdown; }
+        public PetApp(bool isSmoke,bool isQwenSmoke=false) {
+            smoke=isSmoke;qwenSmoke=isQwenSmoke;ShutdownMode=ShutdownMode.OnExplicitShutdown;
+        }
         protected override void OnStartup(StartupEventArgs e) {
             base.OnStartup(e);
             assets=PetAssets.Load(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"content"));
@@ -135,7 +143,43 @@ namespace Tamago {
             timer=new DispatcherTimer(DispatcherPriority.Render);
             timer.Interval=TimeSpan.FromMilliseconds(33); timer.Tick+=Tick;
             previousTime=clock.Elapsed.TotalSeconds; timer.Start();
-            if(smoke) Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,new Action(SmokeTest));
+            if(qwenSmoke)Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,new Action(QwenAgentSmoke));
+            else if(smoke)Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,new Action(SmokeTest));
+        }
+        async void QwenAgentSmoke() {
+            string output=Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"..","output"));
+            Directory.CreateDirectory(output);
+            string report=Path.Combine(output,"qwen-agent-smoke.txt");
+            try {
+                // The welcome bubble has priority in the normal app; clear it only in this isolated smoke run.
+                bubbleUntil=0;petUntil=0;
+                dialogue.SetEnabled(false,clock.Elapsed.TotalSeconds);
+                ambientInteractions.SetEnabled(false,clock.Elapsed.TotalSeconds);
+                AgentRunResult result;
+                using(QwenModelAdapter adapter=new QwenModelAdapter()) {
+                    AgentRuntime runtime=new AgentRuntime(this,adapter);
+                    result=await runtime.RunAsync(new AgentRequest(
+                        "请调用 set_action 把玉子的动作设为 Sit，然后根据工具结果告诉我是否成功。",
+                        new [] {"set_action"}),CancellationToken.None);
+                }
+                bool applied=false;
+                List<string> lines=new List<string> {"RunCode="+result.Code,"ModelTurns="+result.ModelTurns};
+                foreach(AgentToolFeedback item in result.ToolTrace) {
+                    lines.Add("Tool="+item.Name+"; Code="+item.Code);
+                    if(item.Name=="set_action"&&item.Code==AgentToolCode.Applied)applied=true;
+                }
+                lines.Add("Action="+(result.Snapshot==null?"unavailable":result.Snapshot.Action.ToString()));
+                lines.Add("Reply="+(result.Reply??"").Replace('\r',' ').Replace('\n',' '));
+                bool success=result.Code==AgentRunCode.Completed&&applied&&
+                    result.Snapshot!=null&&result.Snapshot.Action==PetAction.Sit;
+                lines.Add(success?"PASS Qwen Agent end-to-end smoke":"FAIL Qwen Agent end-to-end smoke");
+                File.WriteAllLines(report,lines.ToArray());
+                quitting=true;Shutdown(success?0:1);
+            } catch(Exception error) {
+                // Keep credentials, headers and provider response bodies out of the report.
+                File.WriteAllText(report,"FAIL Qwen Agent smoke: "+error.GetType().Name);
+                quitting=true;Shutdown(1);
+            }
         }
         T Find<T>(string name) where T:class { return panel.FindName(name) as T; }
         static SolidColorBrush Brush(string color) { return (SolidColorBrush)new BrushConverter().ConvertFromString(color); }
