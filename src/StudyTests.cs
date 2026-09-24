@@ -100,14 +100,18 @@ namespace Tamago {
                 throw new Exception("学习菜单未显示剩余时间与提前结束");
             Refresh();panel.UpdateLayout();Capture(panel,Path.Combine(output,"study-active-panel.png"));
             AdvanceStudy(start.AddMinutes(25));
-            if(study.Active!=null||studyReminder==null||engine.Action!=PetAction.Jump||study.Day(start.AddMinutes(25).LocalDateTime).Count!=1||!bubbleText.Text.Contains("休息"))
+            if(study.Active!=null||studyReminder==null||engine.Action!=profile.StudyCompletionAction||
+                study.Day(start.AddMinutes(25).LocalDateTime).Count!=1||bubbleText.Text!=profile.StudyCompletionText(25))
                 throw new Exception("拖动期间到期没有完成计时、统计与休息提醒");
             engine.Dragging=false;Refresh();RefreshSpeech(bubbleStarted+.3);panel.UpdateLayout();
             Capture(panel,Path.Combine(output,"study-complete-panel.png"));
+            pet.UpdateLayout();Capture(pet,Path.Combine(output,"study-complete-pet.png"));
+            checks.Add("PASS study completion feedback: "+profile.CharacterName+"; action="+profile.StudyCompletionAction);
             studyReminderUntil=0;AdvanceStudy(start.AddMinutes(26));
             if(StudyBusy||engine.Automatic||engine.Action!=PetAction.Run||dialogue.Enabled)throw new Exception("学习结束未恢复手动行为与聊天偏好");
             StartStudy(45,start.AddHours(1));EndStudy(start.AddHours(1).AddMinutes(1),true);
-            if(StudyBusy||study.Day(start.AddMinutes(25).LocalDateTime).Count!=1)throw new Exception("提前结束被错误计数");
+            if(StudyBusy||study.Day(start.AddMinutes(25).LocalDateTime).Count!=1||bubbleUntil!=0)
+                throw new Exception("提前结束被错误计数或触发完成提醒");
             engine.SetAutomatic(true);StartStudy(60,start.AddHours(2));
             study=StudyState.Parse(study.Serialize());engine.Studying=false;EnterStudy();
             EndStudy(start.AddHours(3),true);

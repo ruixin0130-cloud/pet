@@ -126,7 +126,7 @@ namespace Tamago {
                     image.Freeze();images.Add(item.Key,image);
                 }
             }
-            PetAssets result=new PetAssets {Profile=PetProfile.FromJson(profile),Id=id};
+            PetAssets result=new PetAssets {Profile=PetProfile.FromJson(profile,m.actions.Keys),Id=id};
             foreach(PetAction a in Enum.GetValues(typeof(PetAction))) {
                 ClipDefinition clip;if(!m.actions.TryGetValue(a.ToString(),out clip))throw new InvalidDataException("基础动作缺失");
                 result.actions.Add(a,new PetClip(clip,images,false));

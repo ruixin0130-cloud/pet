@@ -2,6 +2,10 @@
   "characterName": "玉子",
   "welcome": "你好呀，我是玉子。\n很高兴陪在你身边。",
   "companionSeconds": 8,
+  "studyCompletion": {
+    "text": "完成 {minutes} 分钟学习啦！\n起来走走，休息一下吧～",
+    "action": "Jump"
+  },
   "actionLabels": {
     "Idle": "静静陪着你",
     "WalkLeft": "向左散步",

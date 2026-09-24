@@ -2,6 +2,10 @@
   "characterName": "蓝豆",
   "welcome": "你好，我是蓝豆！",
   "companionSeconds": 8,
+  "studyCompletion": {
+    "text": "蓝豆陪你完成 {minutes} 分钟！\n起来活动一下吧～",
+    "action": "Sit"
+  },
   "actionLabels": {
     "Idle": "蓝豆待机",
     "WalkLeft": "向左散步",

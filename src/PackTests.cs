@@ -46,6 +46,10 @@ namespace Tamago {
                 CopyDirectory(content,root);Select(root,"tamago");
                 PetAssets normal=PetAssets.Load(root),builtin=PetAssets.BuiltIn();
                 check(normal.Error==null&&normal.Id=="tamago"&&normal.Profile.CharacterName=="玉子","default directory package loads");
+                check(normal.Profile.StudyCompletionAction==PetAction.Jump&&
+                    normal.Profile.StudyCompletionText(25)=="完成 25 分钟学习啦！\n起来走走，休息一下吧～"&&
+                    builtin.Profile.StudyCompletionAction==PetAction.Jump,
+                    "directory and embedded Tamago study feedback agree");
                 check(normal.Action(PetAction.Idle).At(0,0).PixelWidth==318&&normal.Action(PetAction.Idle).At(0,0).PixelHeight==336,"unequal default crop boundaries preserved");
                 check(normal.Action(PetAction.Idle).Index(3,0)==1&&normal.Action(PetAction.Idle).Index(5.6,0)==3&&normal.Action(PetAction.Idle).Index(5.8,0)==4&&normal.Action(PetAction.Idle).Index(6.1,0)==0,"idle look and blink timing preserved");
                 foreach(PetAction action in Enum.GetValues(typeof(PetAction))) {
@@ -62,6 +66,28 @@ namespace Tamago {
                 check(petting.Count==3&&petting.Index(1.05,2.1)==1&&petting.Index(2.1,2.1)==2,"default interaction timing and endpoint");
                 Select(root,"test-orb");PetAssets test=PetAssets.Load(root);
                 check(test.Error==null&&test.Profile.CharacterName=="蓝豆"&&test.Action(PetAction.WalkLeft).Count==5&&test.Interaction(PetInteraction.Petted).Count==4,"same loader switches identity and variable frame counts");
+                check(test.Profile.StudyCompletionAction==PetAction.Sit&&
+                    test.Profile.StudyCompletionText(45)=="蓝豆陪你完成 45 分钟！\n起来活动一下吧～",
+                    "test-orb loads its own study completion action and text");
+                PetProfile missingFeedback=PetProfile.FromJson("{}");
+                check(missingFeedback.StudyCompletionAction==PetAction.Jump&&
+                    missingFeedback.StudyCompletionText(60)=="完成 60 分钟学习啦！\n起来走走，休息一下吧～",
+                    "older profiles keep safe study completion defaults");
+                foreach(string invalidAction in new [] {"Petted","99","jump","Unknown"}) {
+                    PetProfile fallback=PetProfile.FromJson("{\"studyCompletion\":{\"action\":\""+invalidAction+"\"}}");
+                    check(fallback.StudyCompletionAction==PetAction.Jump,"invalid study action falls back: "+invalidAction);
+                }
+                PetProfile unavailable=PetProfile.FromJson("{\"studyCompletion\":{\"action\":\"Sit\"}}",
+                    new [] {"Idle","Jump"});
+                check(unavailable.StudyCompletionAction==PetAction.Jump,
+                    "study action must exist among the current package's basic clips");
+                foreach(string invalidText in new [] {"", "太长了"+new string('字',80),"第一行\n第二行\n第三行","第一行\t第二行","完成 {count} 分钟"}) {
+                    PetProfile fallback=PetProfile.FromJson(new JavaScriptSerializer().Serialize(
+                        new {studyCompletion=new {text=invalidText,action="Sit"}}));
+                    check(fallback.StudyCompletionAction==PetAction.Sit&&
+                        fallback.StudyCompletionText(25)=="完成 25 分钟学习啦！\n起来走走，休息一下吧～",
+                        "invalid study reminder falls back independently of action");
+                }
                 PetClip walk=test.Action(PetAction.WalkLeft),touch=test.Interaction(PetInteraction.Petted);
                 check(walk.Index(.11,0)==1&&walk.Index(.25,0)==2&&walk.Index(walk.Length+.01,0)==0,"nonuniform five-frame basic timing and looping");
                 check(touch.Index(.41,4)==1&&touch.Index(1.21,4)==2&&touch.Index(2.41,4)==3&&touch.Index(4,4)==3,"four-frame interaction weights stretch across profile duration");

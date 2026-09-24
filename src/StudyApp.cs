@@ -50,9 +50,10 @@ namespace Tamago {
             if(early)RestoreStudyBehavior(finished);
             else {
                 studyReminder=finished;studyReminderUntil=clock.Elapsed.TotalSeconds+6;
-                engine.SetAction(PetAction.Sit,false);engine.SetAction(PetAction.Jump,false);
+                engine.SetAction(PetAction.Sit,false);
+                engine.SetAction(profile.StudyCompletionAction,false);
                 engine.HoldAutomatic(7);
-                Say("完成 "+finished.Minutes+" 分钟学习啦！\n起来走走，休息一下吧～",6);
+                Say(profile.StudyCompletionText(finished.Minutes),6);
             }
             Refresh();Save();
             return true;

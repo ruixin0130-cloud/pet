@@ -19,14 +19,21 @@ namespace Tamago {
     }
     /// <summary>Loads character-facing content from an optional JSON file and keeps safe built-in defaults.</summary>
     public sealed class PetProfile {
+        const string DefaultStudyCompletion="完成 {minutes} 分钟学习啦！\n起来走走，休息一下吧～";
         static PetProfile current=CreateDefault();
         readonly Dictionary<PetAction,string> actionLabels=new Dictionary<PetAction,string>();
         readonly Dictionary<PetInteraction,InteractionProfile> interactions=new Dictionary<PetInteraction,InteractionProfile>();
         ReadOnlyCollection<string> dialoguePhrases;
         ReadOnlyCollection<PetInteraction> ambientInteractions;
+        string studyCompletionTemplate=DefaultStudyCompletion;
+        PetAction studyCompletionAction=PetAction.Jump;
         public string CharacterName="玉子",Welcome="你好呀，我是玉子。\n很高兴陪在你身边。";
         public double CompanionSeconds=8;
         public EnergyProfile Energy=new EnergyProfile();
+        public PetAction StudyCompletionAction { get { return studyCompletionAction; } }
+        public string StudyCompletionText(int minutes) {
+            return studyCompletionTemplate.Replace("{minutes}",minutes.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
         public static PetProfile Current { get { return current; } set { current=value??CreateDefault(); } }
         public ReadOnlyCollection<string> DialoguePhrases { get { return dialoguePhrases; } }
         public ReadOnlyCollection<PetInteraction> AmbientInteractions { get { return ambientInteractions; } }
@@ -87,7 +94,30 @@ namespace Tamago {
             }
             return new ReadOnlyCollection<string>(result);
         }
-        public static PetProfile FromJson(string json) {
+        static string StudyText(Dictionary<string,object> map,string fallback) {
+            object raw;
+            if(map==null||!map.TryGetValue("text",out raw))return fallback;
+            string text=raw as string;
+            if(text==null)return fallback;
+            text=text.Replace("\r\n","\n").Trim();
+            if(text.Length==0||text.Length>80||text.Replace("{minutes}","").IndexOfAny(new[]{'{','}'})>=0)
+                return fallback;
+            string[] lines=text.Split('\n');
+            if(lines.Length>2)return fallback;
+            foreach(string line in lines)if(String.IsNullOrWhiteSpace(line))return fallback;
+            foreach(char character in text)if(character!='\n'&&Char.IsControl(character))return fallback;
+            return text;
+        }
+        static PetAction StudyAction(Dictionary<string,object> map,ICollection<string> availableActions,PetAction fallback) {
+            object raw;PetAction action;
+            string name=map!=null&&map.TryGetValue("action",out raw)?raw as string:null;
+            return name!=null&&Enum.TryParse<PetAction>(name,false,out action)&&
+                Enum.IsDefined(typeof(PetAction),action)&&
+                String.Equals(Enum.GetName(typeof(PetAction),action),name,StringComparison.Ordinal)&&
+                (availableActions==null||availableActions.Contains(name))?action:fallback;
+        }
+        public static PetProfile FromJson(string json) { return FromJson(json,null); }
+        internal static PetProfile FromJson(string json,ICollection<string> availableActions) {
             PetProfile profile=CreateDefault();
             Dictionary<string,object> root=ObjectMap(new JavaScriptSerializer().DeserializeObject(json));
             if(root==null)throw new ArgumentException("profile root must be an object");
@@ -95,6 +125,11 @@ namespace Tamago {
             profile.Welcome=Text(root,"welcome",profile.Welcome);
             profile.CompanionSeconds=Number(root,"companionSeconds",profile.CompanionSeconds,2,30);
             object value;
+            Dictionary<string,object> studyMap;
+            if(root.TryGetValue("studyCompletion",out value)&&(studyMap=ObjectMap(value))!=null) {
+                profile.studyCompletionTemplate=StudyText(studyMap,profile.studyCompletionTemplate);
+                profile.studyCompletionAction=StudyAction(studyMap,availableActions,profile.studyCompletionAction);
+            }
             if(root.TryGetValue("dialogue",out value))profile.dialoguePhrases=Phrases(value,profile.dialoguePhrases);
             Dictionary<string,object> actionMap;
             if(root.TryGetValue("actionLabels",out value)&&(actionMap=ObjectMap(value))!=null)

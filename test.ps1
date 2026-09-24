@@ -28,6 +28,7 @@ foreach ($packId in @('test-orb','missing-package')) {
     $expected = if ($packId -eq 'test-orb') {'pack=test-orb; fallback=none'} else {'pack=builtin; fallback='}
     if (-not $packLog.Contains($expected)) { throw "Unexpected selected package: $packId" }
     Copy-Item -LiteralPath (Join-Path $packRun 'output/panel-preview.png') -Destination (Join-Path $PSScriptRoot "output/pack-$packId-panel.png") -Force
+    Copy-Item -LiteralPath (Join-Path $packRun 'output/study-complete-pet.png') -Destination (Join-Path $PSScriptRoot "output/pack-$packId-study-complete-pet.png") -Force
     Copy-Item -LiteralPath (Join-Path $packRun 'output/smoke-test.txt') -Destination (Join-Path $PSScriptRoot "output/pack-$packId-smoke.txt") -Force
     Write-Host "PASS same EXE restart: $packId"
 }
