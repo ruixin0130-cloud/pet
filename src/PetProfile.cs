@@ -163,7 +163,10 @@ namespace Tamago {
             error=null;
             try {
                 if(!File.Exists(path)){error="内容配置不存在，已使用内置默认值。";return CreateDefault();}
-                return FromJson(File.ReadAllText(path));
+                using(FileStream stream=File.OpenRead(path)) {
+                    if(stream.Length>1024*1024)throw new InvalidDataException("profile too large");
+                    using(StreamReader reader=new StreamReader(stream))return FromJson(reader.ReadToEnd());
+                }
             } catch(Exception) {
                 error="内容配置无效，已使用内置默认值。";return CreateDefault();
             }

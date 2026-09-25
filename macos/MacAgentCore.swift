@@ -148,6 +148,9 @@ enum MacModelError: Error {
                               Task.isCancelled ? "请求已取消；已执行的操作见记录。" : "模型暂不可用；已执行的操作见记录。", trace)
             }
             if Task.isCancelled { return result(.cancelled, "请求已取消；已执行的操作见记录。", trace) }
+            if ProcessInfo.processInfo.systemUptime >= deadline {
+                return result(.modelTimeout, "模型响应超时；已执行的操作见记录。", trace)
+            }
             switch decision {
             case .final(let text):
                 let reply = text.trimmingCharacters(in: .whitespacesAndNewlines)

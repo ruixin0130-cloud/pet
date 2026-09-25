@@ -54,8 +54,20 @@ enum MacAPIKeyStore {
 @MainActor final class MacQwenAdapter: MacAgentModel {
     private static let endpoint = URL(string: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")!
     private let apiKey: String
+    private let session: URLSession
 
-    init(apiKey: String) { self.apiKey = apiKey }
+    init(apiKey: String, session: URLSession? = nil) {
+        self.apiKey = apiKey
+        if let session {
+            self.session = session
+        } else {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.urlCache = nil
+            configuration.httpCookieStorage = nil
+            configuration.httpShouldSetCookies = false
+            self.session = URLSession(configuration: configuration)
+        }
+    }
 
     private static let tools: [[String: Any]] = [
         ["type": "function", "function": [
@@ -93,15 +105,23 @@ enum MacAPIKeyStore {
         if !finalOnly { payload["tools"] = Self.tools }
         var request = URLRequest(url: Self.endpoint)
         request.httpMethod = "POST"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.httpShouldHandleCookies = false
         request.timeoutInterval = max(1, min(timeout, 30))
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (bytes, response) = try await session.bytes(for: request)
+        defer { bytes.task.cancel() }
         try Task.checkCancellation()
         guard let http = response as? HTTPURLResponse else { throw MacModelError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else { throw MacModelError.httpStatus(http.statusCode) }
-        guard data.count <= 1_048_576 else { throw MacModelError.responseTooLarge }
+        var data = Data()
+        for try await byte in bytes {
+            if data.count >= 1_048_576 { throw MacModelError.responseTooLarge }
+            data.append(byte)
+        }
+        try Task.checkCancellation()
         return try Self.parse(data)
     }
 

@@ -1,5 +1,18 @@
 import Foundation
 
+private final class OversizeResponseProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200,
+                                       httpVersion: nil, headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(repeating: 65, count: 1_048_577))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
 @MainActor private final class FakePet: MacPetPort {
     var action = "Idle"
     var speech: String?
@@ -85,6 +98,19 @@ import Foundation
                 check(id == "call-1" && name == "speak" && args["text"] as? String == "你好",
                       "Qwen tool parse")
             } else { preconditionFailure("expected tool") }
+        }
+        do {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [OversizeResponseProtocol.self]
+            let session = URLSession(configuration: configuration)
+            defer { session.invalidateAndCancel() }
+            let adapter = MacQwenAdapter(apiKey: "test-only", session: session)
+            let snapshot = FakePet().snapshot()
+            do {
+                _ = try await adapter.next(input: "test", snapshot: snapshot, feedback: [],
+                                           turn: 1, finalOnly: false, timeout: 10)
+                preconditionFailure("oversized response was accepted")
+            } catch MacModelError.responseTooLarge {}
         }
         print("Mac Agent tests passed")
     }

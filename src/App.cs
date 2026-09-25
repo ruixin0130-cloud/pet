@@ -114,7 +114,12 @@ namespace Tamago {
             dialogue=new DialogueScheduler();
             PetSettings saved=new PetSettings();
             if(!smoke) {
-                try { if(File.Exists(SettingsFile))saved=PetSettings.Parse(File.ReadAllText(SettingsFile)); }
+                try {
+                    if(File.Exists(SettingsFile))using(FileStream stream=File.OpenRead(SettingsFile)) {
+                        if(stream.Length<=131072)using(StreamReader reader=new StreamReader(stream))
+                            saved=PetSettings.Parse(reader.ReadToEnd());
+                    }
+                }
                 catch(IOException) {} catch(UnauthorizedAccessException) {}
             }
             engine.Size=saved.Size; engine.Speed=saved.Speed; engine.Automatic=saved.Automatic;

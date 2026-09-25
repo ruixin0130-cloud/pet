@@ -34,20 +34,54 @@ private final class SpriteLibrary {
     private let atlases: [String: CGImage]
     private var cache: [String: [SpriteFrame]] = [:]
 
+    private static func boundedData(at url: URL) throws -> Data {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let data = try handle.read(upToCount: 1_048_577) ?? Data()
+        guard data.count <= 1_048_576 else { throw CocoaError(.fileReadTooLarge) }
+        return data
+    }
+
+    private static func pngDimensions(at url: URL) throws -> (Int, Int) {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        guard let size = attributes[.size] as? NSNumber,
+              size.int64Value <= 32 * 1024 * 1024 else { throw CocoaError(.fileReadTooLarge) }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let header = try handle.read(upToCount: 24) ?? Data()
+        let signature: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82]
+        guard header.count == 24, Array(header.prefix(16)) == signature else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let width = header[16..<20].reduce(0) { $0 * 256 + Int($1) }
+        let height = header[20..<24].reduce(0) { $0 * 256 + Int($1) }
+        guard (1...8192).contains(width), (1...8192).contains(height) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return (width, height)
+    }
+
     init(resources: URL) throws {
         let pet = resources.appendingPathComponent("tamago", isDirectory: true)
         manifest = try JSONDecoder().decode(PetManifest.self,
-            from: Data(contentsOf: pet.appendingPathComponent("manifest.json")))
+            from: Self.boundedData(at: pet.appendingPathComponent("manifest.json")))
         profile = try JSONDecoder().decode(PetProfile.self,
-            from: Data(contentsOf: pet.appendingPathComponent("profile.json")))
+            from: Self.boundedData(at: pet.appendingPathComponent("profile.json")))
+        guard (1...16).contains(manifest.images.count) else { throw CocoaError(.fileReadCorruptFile) }
         var loaded: [String: CGImage] = [:]
+        var totalPixels = 0
         for (key, filename) in manifest.images {
-            guard !filename.contains("/") && !filename.contains("\\") && !filename.contains("..") else {
+            guard filename.lowercased().hasSuffix(".png"), !filename.contains("/"),
+                  !filename.contains("\\"), !filename.contains("..") else {
                 throw CocoaError(.fileReadInvalidFileName)
             }
             let url = pet.appendingPathComponent(filename)
+            let (width, height) = try Self.pngDimensions(at: url)
+            totalPixels += width * height
+            guard totalPixels <= 32_000_000 else { throw CocoaError(.fileReadTooLarge) }
             guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                  let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+                  let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
+                  image.width == width, image.height == height else {
                 throw CocoaError(.fileReadCorruptFile)
             }
             loaded[key] = image
@@ -58,15 +92,18 @@ private final class SpriteLibrary {
     func frames(named name: String, interaction: Bool = false) -> [SpriteFrame]? {
         let key = (interaction ? "interaction:" : "action:") + name
         if let cached = cache[key] { return cached }
-        guard let clip = (interaction ? manifest.interactions : manifest.actions)[name] else { return nil }
+        guard let clip = (interaction ? manifest.interactions : manifest.actions)[name],
+              (1...128).contains(clip.frames.count) else { return nil }
         var result: [SpriteFrame] = []
         for frame in clip.frames {
-            guard frame.rect.count == 4, frame.time > 0,
+            guard frame.rect.count == 4, frame.time.isFinite,
+                  frame.time > 0, frame.time <= 60,
                   let atlas = atlases[frame.image] else { return nil }
             let values = frame.rect
             guard values[0] >= 0, values[1] >= 0, values[2] > 0, values[3] > 0,
-                  values[0] + values[2] <= atlas.width,
-                  values[1] + values[3] <= atlas.height else { return nil }
+                  values[2] <= atlas.width, values[3] <= atlas.height,
+                  values[0] <= atlas.width - values[2],
+                  values[1] <= atlas.height - values[3] else { return nil }
             let area = CGRect(x: values[0], y: values[1], width: values[2], height: values[3])
             guard let cropped = atlas.cropping(to: area) else { return nil }
             result.append(SpriteFrame(image: NSImage(cgImage: cropped,

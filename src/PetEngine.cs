@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace Tamago {
@@ -115,14 +116,20 @@ namespace Tamago {
         }
         public static PetSettings Parse(string text) {
             PetSettings s=new PetSettings();
+            if(text==null||text.Length>65536)return s;
             try {
-                XElement xml=XElement.Parse(text);
-                s.Size=Number(xml,"size",170,110,240); s.Speed=Number(xml,"speed",72,25,160);
-                s.X=Number(xml,"x",double.NaN,-100000,100000); s.Y=Number(xml,"y",double.NaN,-100000,100000);
-                bool v; if(bool.TryParse((string)xml.Attribute("topmost"),out v))s.Topmost=v;
-                if(bool.TryParse((string)xml.Attribute("automatic"),out v))s.Automatic=v;
-                if(bool.TryParse((string)xml.Attribute("randomSpeech"),out v))s.RandomSpeech=v;
-            } catch(System.Xml.XmlException) { }
+                using(StringReader input=new StringReader(text))
+                using(XmlReader reader=XmlReader.Create(input,new XmlReaderSettings {
+                    DtdProcessing=DtdProcessing.Prohibit,XmlResolver=null,MaxCharactersInDocument=65536
+                })) {
+                    XElement xml=XElement.Load(reader);
+                    s.Size=Number(xml,"size",170,110,240); s.Speed=Number(xml,"speed",72,25,160);
+                    s.X=Number(xml,"x",double.NaN,-100000,100000); s.Y=Number(xml,"y",double.NaN,-100000,100000);
+                    bool v; if(bool.TryParse((string)xml.Attribute("topmost"),out v))s.Topmost=v;
+                    if(bool.TryParse((string)xml.Attribute("automatic"),out v))s.Automatic=v;
+                    if(bool.TryParse((string)xml.Attribute("randomSpeech"),out v))s.RandomSpeech=v;
+                }
+            } catch(XmlException) { }
             return s;
         }
         public string Serialize() {

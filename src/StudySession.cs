@@ -59,9 +59,12 @@ namespace Tamago {
             return root.ToString();
         }
         public static StudyState Parse(string text) {
+            if(text==null||text.Length>8*1024*1024)throw new FormatException("study record too large");
             XElement root;
             using(StringReader input=new StringReader(text))
-            using(XmlReader reader=XmlReader.Create(input,new XmlReaderSettings {DtdProcessing=DtdProcessing.Prohibit,XmlResolver=null}))
+            using(XmlReader reader=XmlReader.Create(input,new XmlReaderSettings {
+                DtdProcessing=DtdProcessing.Prohibit,XmlResolver=null,MaxCharactersInDocument=8*1024*1024
+            }))
                 root=XElement.Load(reader);
             if(root.Name!="study"||(int?)root.Attribute("version")!=1)throw new FormatException("study version");
             StudyState state=new StudyState();
@@ -88,7 +91,11 @@ namespace Tamago {
     }
     public static class StudyStore {
         public static StudyState Load(string path) {
-            return File.Exists(path)?StudyState.Parse(File.ReadAllText(path)):new StudyState();
+            if(!File.Exists(path))return new StudyState();
+            using(FileStream stream=File.OpenRead(path)) {
+                if(stream.Length>8*1024*1024)throw new FormatException("study record too large");
+                using(StreamReader reader=new StreamReader(stream))return StudyState.Parse(reader.ReadToEnd());
+            }
         }
         public static void Save(string path,StudyState state) {
             Directory.CreateDirectory(Path.GetDirectoryName(path));

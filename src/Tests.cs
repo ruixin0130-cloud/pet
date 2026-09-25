@@ -216,6 +216,9 @@ namespace Tamago {
                 s=PetSettings.Parse("<tamago size='NaN' speed='Infinity' x='Infinity' y='oops'/>");
                 Check(s.Size==170&&s.Speed==72&&double.IsNaN(s.X)&&double.IsNaN(s.Y),"invalid settings fall back safely");
                 s=PetSettings.Parse("this is not xml");Check(s.Size==170,"corrupt settings do not block startup");
+                s=PetSettings.Parse("<!DOCTYPE tamago [<!ENTITY attack SYSTEM 'file:///C:/Windows/win.ini'>]><tamago size='&attack;'/>");
+                Check(s.Size==170,"settings parser rejects DTD entities");
+                Check(PetSettings.Parse(new string('x',65537)).Size==170,"oversized settings use defaults");
                 PackTests.Run(Check);
                 TestLifeState();
                 StudyTests.Run(Check);
