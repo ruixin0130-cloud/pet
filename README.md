@@ -1,6 +1,19 @@
 # 玉子 · 桌面宠物 v0.11.0
 
-参照用户提供的灰白猫咪设定图制作的 Windows 桌宠。采用原生 C# / WPF，猫咪直接悬浮在桌面上，背景透明；附带独立动作面板与托盘菜单。
+参照用户提供的灰白猫咪设定图制作的桌宠。Windows 版采用原生 C# / WPF；macOS 版提供复用玉子素材的轻量桌面预览。
+
+## macOS 桌宠预览（Intel Mac）
+
+在仓库根目录运行：
+
+```sh
+zsh macos/build.sh
+open macos/build/TamagoMac.app
+```
+
+只需要 macOS 自带的 AppKit 和 Xcode Command Line Tools，无需安装完整 Xcode 或第三方依赖。玉子会悬浮在桌面右下方、播放角色包中的待机动画；单击摸摸，拖动可移动。右键桌宠或点击菜单栏的“玉子”，可选择坐下、睡觉、恢复待机、找回位置和退出。构建产物位于被 Git 忽略的 `macos/build/TamagoMac.app`。
+
+这一版 macOS 应用专注于让角色在 Mac 桌面可见。下文的 Agent 对话面板、学习陪伴和完整行为系统仍属于 Windows WPF 版，尚未移植到 macOS。
 
 ## Agent 交互 V1.1
 
