@@ -1,8 +1,8 @@
-# 玉子 · 桌面宠物 v0.11.0
+# 玉子 · 桌面宠物 v0.12.0
 
-参照用户提供的灰白猫咪设定图制作的桌宠。Windows 版采用原生 C# / WPF；macOS 版提供复用玉子素材的轻量桌面预览。
+参照用户提供的灰白猫咪设定图制作的桌宠。Windows 版采用原生 C# / WPF；macOS 版复用玉子素材，提供原生桌宠和按需 Agent 交互。
 
-## macOS 桌宠预览（Intel Mac）
+## macOS 桌宠与 Agent（Intel Mac）
 
 在仓库根目录运行：
 
@@ -13,7 +13,9 @@ open macos/build/TamagoMac.app
 
 只需要 macOS 自带的 AppKit 和 Xcode Command Line Tools，无需安装完整 Xcode 或第三方依赖。玉子会悬浮在桌面右下方、播放角色包中的待机动画；单击摸摸，拖动可移动。右键桌宠或点击菜单栏的“玉子”，可选择坐下、睡觉、恢复待机、找回位置和退出。构建产物位于被 Git 忽略的 `macos/build/TamagoMac.app`。
 
-这一版 macOS 应用专注于让角色在 Mac 桌面可见。下文的 Agent 对话面板、学习陪伴和完整行为系统仍属于 Windows WPF 版，尚未移植到 macOS。
+在菜单中选择“设置百炼 API Key…”，将北京地域的百炼 API Key 保存在本机钥匙串。再选择“和玉子说话…”，输入一次请求并点击“发送给玉子”。回复区显示模型回复及每次动作的真实执行结果；可以取消等待，但已执行的动作不会回滚。应用只在发送请求时访问模型，不监听桌面事件，也不保存对话历史。Mac 版只提供 `set_action`、`play_interaction`、`speak` 三种受控工具；拖动、互动和当前气泡优先，忙碌时 Agent 动作不会排队。“摸摸”只能通过真实点击触发。Windows 版的学习陪伴、能量和完整 Agent 工具集尚未移植到 Mac。
+
+本地无网络测试可运行 `zsh macos/test.sh`。测试使用假模型与假桌宠，不读取钥匙串或调用百炼服务。真实模型联调需要你自己在应用内配置有效的 API Key，网络连接也必须可用。
 
 ## Agent 交互 V1.1
 

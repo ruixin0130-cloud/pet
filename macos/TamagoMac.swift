@@ -81,6 +81,7 @@ private final class SpriteLibrary {
 private final class PetView: NSView {
     var sprite: NSImage? { didSet { needsDisplay = true } }
     var onPet: (() -> Void)?
+    var onDraggingChanged: ((Bool) -> Void)?
     private var mouseStart = NSPoint.zero
     private var windowStart = NSPoint.zero
     private var dragged = false
@@ -101,10 +102,14 @@ private final class PetView: NSView {
         let current = NSEvent.mouseLocation
         let dx = current.x - mouseStart.x
         let dy = current.y - mouseStart.y
-        if abs(dx) + abs(dy) > 4 { dragged = true }
+        if abs(dx) + abs(dy) > 4, !dragged {
+            dragged = true
+            onDraggingChanged?(true)
+        }
         window?.setFrameOrigin(NSPoint(x: windowStart.x + dx, y: windowStart.y + dy))
     }
     override func mouseUp(with event: NSEvent) {
+        if dragged { onDraggingChanged?(false) }
         if !dragged { onPet?() }
     }
     override func rightMouseDown(with event: NSEvent) {
@@ -112,7 +117,7 @@ private final class PetView: NSView {
     }
 }
 
-private final class PetController {
+@MainActor private final class PetController: MacPetPort {
     let window: NSWindow
     let view: PetView
     private let bubble: NSTextField
@@ -123,6 +128,10 @@ private final class PetController {
     private var lastTick = ProcessInfo.processInfo.systemUptime
     private var bubbleUntil: TimeInterval = 0
     private var returnToIdle = false
+    private var actionName = "Idle"
+    private var interactionName: String?
+    private var dragging = false
+    private var stopping = false
 
     init(sprites: SpriteLibrary, menu: NSMenu) throws {
         self.sprites = sprites
@@ -156,13 +165,14 @@ private final class PetController {
         bubble.isHidden = true
         root.addSubview(bubble)
         view.onPet = { [weak self] in self?.pet() }
+        view.onDraggingChanged = { [weak self] value in self?.dragging = value }
         window.contentView = root
-        setAction("Idle")
+        chooseAction("Idle")
         moveHome()
         window.orderFrontRegardless()
-        speak(sprites.profile.welcome, for: 5)
+        showSpeech(sprites.profile.welcome, for: 5)
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            self?.tick()
+            MainActor.assumeIsolated { self?.tick() }
         }
     }
 
@@ -173,24 +183,64 @@ private final class PetController {
                                       y: area.minY + 24))
         window.orderFrontRegardless()
     }
-    func setAction(_ name: String) {
+    func chooseAction(_ name: String) {
         guard let next = sprites.frames(named: name) else { return }
         frames = next
         elapsed = 0
         returnToIdle = false
+        interactionName = nil
+        actionName = name
         view.sprite = next[0].image
     }
     func pet() {
-        guard let next = sprites.frames(named: "Petted", interaction: true) else { return }
+        guard !stopping else { return }
+        _ = startInteraction("Petted")
+    }
+    private func startInteraction(_ name: String) -> Bool {
+        guard let next = sprites.frames(named: name, interaction: true) else { return false }
         frames = next
         elapsed = 0
         returnToIdle = true
+        interactionName = name
         view.sprite = next[0].image
-        speak(sprites.profile.interactions["Petted"]?.line ?? "呼噜呼噜～", for: 3)
+        if let line = sprites.profile.interactions[name]?.line {
+            showSpeech(line, for: 3)
+        }
+        return true
     }
-    func stop() { timer?.invalidate(); timer = nil }
+    func stop() { stopping = true; timer?.invalidate(); timer = nil }
 
-    private func speak(_ text: String, for seconds: TimeInterval) {
+    func snapshot() -> MacPetSnapshot {
+        MacPetSnapshot(characterName: sprites.profile.characterName, action: actionName,
+                       interaction: interactionName,
+                       currentSpeech: bubble.isHidden ? nil : bubble.stringValue,
+                       busy: dragging || interactionName != nil || !bubble.isHidden)
+    }
+    private func agentReady() -> MacToolCode? {
+        if stopping { return .shuttingDown }
+        if snapshot().busy { return .busy }
+        return nil
+    }
+    func setAction(_ action: String) -> MacToolCode {
+        if let code = agentReady() { return code }
+        guard ["Idle", "Sit", "Lie", "Sleep"].contains(action),
+              sprites.frames(named: action) != nil else { return .malformedArguments }
+        chooseAction(action)
+        return .applied
+    }
+    func playInteraction(_ name: String) -> MacToolCode {
+        if let code = agentReady() { return code }
+        guard ["Curious", "PlayYarn", "Pout", "Excited"].contains(name),
+              startInteraction(name) else { return .malformedArguments }
+        return .applied
+    }
+    func speak(_ text: String) -> MacToolCode {
+        if let code = agentReady() { return code }
+        showSpeech(text, for: 6)
+        return .applied
+    }
+
+    private func showSpeech(_ text: String, for seconds: TimeInterval) {
         bubble.stringValue = text.replacingOccurrences(of: "\n", with: " ")
         bubble.isHidden = false
         bubbleUntil = ProcessInfo.processInfo.systemUptime + seconds
@@ -204,7 +254,7 @@ private final class PetController {
         elapsed += delta
         let total = frames.reduce(0) { $0 + $1.duration }
         if elapsed >= total {
-            if returnToIdle { setAction("Idle"); return }
+            if returnToIdle { chooseAction("Idle"); return }
             elapsed = elapsed.truncatingRemainder(dividingBy: total)
         }
         var time = elapsed
@@ -216,9 +266,11 @@ private final class PetController {
     }
 }
 
-private final class PetAppDelegate: NSObject, NSApplicationDelegate {
+@MainActor private final class PetAppDelegate: NSObject, NSApplicationDelegate {
     private var controller: PetController?
     private var statusItem: NSStatusItem?
+    private var agentUI: MacAgentUI?
+    private var agentTask: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let menu = NSMenu()
@@ -227,6 +279,9 @@ private final class PetAppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "睡觉", action: #selector(sleep), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "恢复待机", action: #selector(idle), keyEquivalent: ""))
         menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "和玉子说话…", action: #selector(openAgent), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "设置百炼 API Key…", action: #selector(setAPIKey), keyEquivalent: ""))
+        menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "找回玉子", action: #selector(home), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "退出玉子", action: #selector(quit), keyEquivalent: ""))
         for item in menu.items { item.target = self }
@@ -234,6 +289,10 @@ private final class PetAppDelegate: NSObject, NSApplicationDelegate {
             guard let resources = Bundle.main.resourceURL else { throw CocoaError(.fileNoSuchFile) }
             let sprites = try SpriteLibrary(resources: resources)
             controller = try PetController(sprites: sprites, menu: menu)
+            agentUI = MacAgentUI()
+            agentUI?.onSend = { [weak self] text in self?.sendToAgent(text) }
+            agentUI?.onCancel = { [weak self] in self?.agentTask?.cancel() }
+            agentUI?.onSetKey = { [weak self] in self?.setAPIKey() }
             statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
             statusItem?.button?.title = "🐈 玉子"
             statusItem?.menu = menu
@@ -246,17 +305,68 @@ private final class PetAppDelegate: NSObject, NSApplicationDelegate {
             NSApplication.shared.terminate(nil)
         }
     }
-    func applicationWillTerminate(_ notification: Notification) { controller?.stop() }
+    func applicationWillTerminate(_ notification: Notification) {
+        agentTask?.cancel()
+        controller?.stop()
+    }
     @objc private func pet() { controller?.pet() }
-    @objc private func sit() { controller?.setAction("Sit") }
-    @objc private func sleep() { controller?.setAction("Sleep") }
-    @objc private func idle() { controller?.setAction("Idle") }
+    @objc private func sit() { controller?.chooseAction("Sit") }
+    @objc private func sleep() { controller?.chooseAction("Sleep") }
+    @objc private func idle() { controller?.chooseAction("Idle") }
     @objc private func home() { controller?.moveHome() }
     @objc private func quit() { NSApplication.shared.terminate(nil) }
+    @objc private func openAgent() { agentUI?.show() }
+
+    @objc private func setAPIKey() {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "设置百炼 API Key"
+        alert.informativeText = "仅保存在本机钥匙串。请使用北京地域的百炼 API Key。"
+        let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        field.placeholderString = "API Key"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "保存")
+        alert.addButton(withTitle: "取消")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try MacAPIKeyStore.save(field.stringValue)
+            agentUI?.showStatus("API Key 已存入钥匙串。")
+        } catch {
+            agentUI?.showStatus("API Key 保存失败：\(error.localizedDescription)")
+        }
+    }
+
+    private func sendToAgent(_ input: String) {
+        guard agentTask == nil, let controller, let agentUI else { return }
+        let key: String
+        do {
+            guard let saved = try MacAPIKeyStore.load() else {
+                agentUI.showStatus("请先通过菜单设置百炼 API Key。")
+                return
+            }
+            key = saved
+        } catch {
+            agentUI.showStatus("无法读取钥匙串：\(error.localizedDescription)")
+            return
+        }
+        let runtime = MacAgentRuntime(port: controller, model: MacQwenAdapter(apiKey: key))
+        agentUI.setRunning(true)
+        agentTask = Task { [weak self] in
+            let result = await runtime.run(input)
+            guard let self else { return }
+            agentUI.showResult(result)
+            agentUI.setRunning(false)
+            self.agentTask = nil
+        }
+    }
 }
 
-let app = NSApplication.shared
-private let delegate = PetAppDelegate()
-app.delegate = delegate
-app.setActivationPolicy(.accessory)
-app.run()
+@main struct TamagoApplication {
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = PetAppDelegate()
+        app.delegate = delegate
+        app.setActivationPolicy(.accessory)
+        app.run()
+    }
+}

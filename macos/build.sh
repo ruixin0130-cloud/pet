@@ -10,7 +10,9 @@ mkdir -p "$repo/macos/build/ModuleCache"
 CLANG_MODULE_CACHE_PATH="$repo/macos/build/ModuleCache" \
 xcrun swiftc -O -target x86_64-apple-macos13.0 \
     -module-cache-path "$repo/macos/build/ModuleCache" \
-    "$repo/macos/TamagoMac.swift" -o "$contents/MacOS/TamagoMac"
+    "$repo/macos/TamagoMac.swift" "$repo/macos/MacAgentCore.swift" \
+    "$repo/macos/MacQwenAdapter.swift" "$repo/macos/MacAgentUI.swift" \
+    -o "$contents/MacOS/TamagoMac"
 cp "$repo/macos/Info.plist" "$contents/Info.plist"
 cp "$repo/assets/tamago-app-icon.png" "$contents/Resources/AppIcon.png"
 cp "$repo/content/pets/tamago/manifest.json" "$contents/Resources/tamago/manifest.json"
