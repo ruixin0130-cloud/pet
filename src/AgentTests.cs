@@ -1,10 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Threading;
 
 namespace Tamago {
     public sealed partial class PetApp {
+        sealed class ChatTestModel : IAgentModelAdapter {
+            readonly Queue<Task<ModelDecision>> answers=new Queue<Task<ModelDecision>>();
+            public void Then(ModelDecision answer) { answers.Enqueue(Task.FromResult(answer)); }
+            public void Then(Task<ModelDecision> answer) { answers.Enqueue(answer); }
+            public Task<ModelDecision> NextAsync(AgentModelTurn turn,CancellationToken token) { return answers.Dequeue(); }
+        }
         T WaitForAgent<T>(Task<T> task) {
             if(!task.IsCompleted) {
                 DispatcherFrame frame=new DispatcherFrame();
@@ -101,6 +110,61 @@ namespace Tamago {
             studyLoadFailed=false;
             bubbleUntil=0;interaction.Clear();engine.SetAutomatic(true);engine.SetAction(PetAction.Idle,false);
             checks.Add("PASS Agent Ready V1 snapshot, dispatcher, commands and priority rules");
+        }
+        void TestAgentChatUi(List<string> checks) {
+            if(agentInput==null||agentSend==null||agentCancel==null||agentStatus==null||agentReply==null||agentToolTrace==null)
+                throw new Exception("Agent 输入区未接入面板");
+            bubbleUntil=0;petUntil=0;companionUntil=0;interaction.Clear();
+            ChatTestModel model=new ChatTestModel();
+            model.Then(ModelDecision.Call(new AgentToolCall("ui-action","set_action","{\"action\":\"Sit\"}")));
+            model.Then(ModelDecision.Final("玉子已经坐好了。"));
+            agentRuntime=new AgentRuntime(this,model);
+            agentInput.Text="请坐下";
+            agentSend.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            AgentRunResult result=WaitForAgent(agentPending);
+            if(result==null||result.Code!=AgentRunCode.Completed||result.ToolTrace.Count!=1||
+                result.ToolTrace[0].Code!=AgentToolCode.Applied||engine.Action!=PetAction.Sit||
+                agentReply.Text!="玉子已经坐好了。"||agentInput.Text!=""||!agentSend.IsEnabled||agentCancel.IsEnabled)
+                throw new Exception("Agent 面板未显示真实的动作执行结果");
+
+            bubbleUntil=clock.Elapsed.TotalSeconds+8;
+            model=new ChatTestModel();
+            model.Then(ModelDecision.Call(new AgentToolCall("ui-busy","set_action","{\"action\":\"Run\"}")));
+            model.Then(ModelDecision.Final("已经跑起来了。"));
+            agentRuntime=new AgentRuntime(this,model);
+            agentInput.Text="请跑步";
+            agentSend.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            result=WaitForAgent(agentPending);
+            if(result==null||result.Code!=AgentRunCode.Busy||engine.Action!=PetAction.Sit||
+                !agentToolTrace.Text.Contains("Busy")||agentReply.Text.Contains("跑起来")||agentInput.Text!="请跑步")
+                throw new Exception("Agent 面板把忙碌操作误报为成功");
+            bubbleUntil=0;
+
+            TaskCompletionSource<ModelDecision> unavailable=new TaskCompletionSource<ModelDecision>();
+            unavailable.SetException(new InvalidOperationException("fake provider failure"));
+            model=new ChatTestModel();model.Then(unavailable.Task);
+            agentRuntime=new AgentRuntime(this,model);
+            agentInput.Text="模型故障";
+            agentSend.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            result=WaitForAgent(agentPending);
+            if(result==null||result.Code!=AgentRunCode.ModelUnavailable||
+                !agentStatus.Text.Contains("模型暂不可用")||agentInput.Text!="模型故障")
+                throw new Exception("Agent 面板未报告模型故障");
+
+            TaskCompletionSource<ModelDecision> waiting=new TaskCompletionSource<ModelDecision>();
+            model=new ChatTestModel();model.Then(waiting.Task);
+            agentRuntime=new AgentRuntime(this,model);
+            agentInput.Text="等待取消";
+            agentSend.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if(agentSend.IsEnabled||!agentCancel.IsEnabled)throw new Exception("Agent 请求处理中未锁定重复提交");
+            agentCancel.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            result=WaitForAgent(agentPending);
+            if(result==null||result.Code!=AgentRunCode.Cancelled||!agentSend.IsEnabled||agentCancel.IsEnabled||
+                agentInput.Text!="等待取消")throw new Exception("Agent 面板取消后未恢复输入");
+            agentRuntime=null;
+            agentInput.Clear();agentReply.Text="";agentToolTrace.Text="";
+            agentStatus.Text="发送会调用 Qwen；不会自动监听桌面";
+            checks.Add("PASS Agent input submits, reports tool outcomes, blocks duplicates and cancels");
         }
     }
 }

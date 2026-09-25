@@ -1,10 +1,18 @@
-# 玉子 · 桌面宠物 v0.10.0
+# 玉子 · 桌面宠物 v0.11.0
 
 参照用户提供的灰白猫咪设定图制作的 Windows 桌宠。采用原生 C# / WPF，猫咪直接悬浮在桌面上，背景透明；附带独立动作面板与托盘菜单。
 
+## Agent 交互 V1.1
+
+普通启动后，在面板左侧的“和玉子说话”输入一次请求，点击“发送给玉子”或按 `Ctrl+Enter`。面板会显示模型回复、请求状态和每次工具调用的实际结果；取消请求后，已执行的动作不会撤销。一次只处理一个请求，处理时会暂时停用输入与发送。空请求和超过 1000 字的请求不会发送。
+
+首次发送时才读取进程的 `DASHSCOPE_API_KEY` 并建立 Qwen 适配器；没有配置时面板给出提示，设置环境变量后需重启应用。普通启动不会自动向模型发请求，也不会监听桌面事件。每次发送都是独立请求，没有跨请求对话记忆。模型可使用的六种受控动作、优先级和时限仍由现有 Runtime、Router 和 Pet Port 决定；“忙碌”或失败的工具调用会在面板中如实显示。API Key 不保存在角色包或应用设置中。
+
+Windows 回归测试 `powershell -ExecutionPolicy Bypass -File .\test.ps1` 包含面板提交、真实动作反馈、忙碌结果和取消流程。使用真实服务的联调仍可运行下述 `--qwen-agent-smoke`；需要可用的 API Key 与网络。
+
 ## Qwen Model Adapter V1
 
-`QwenModelAdapter` 把现有 `IAgentModelAdapter` 接到阿里云百炼北京地域的 `qwen3.8-flash` Chat Completions 接口。每轮只发送当前请求、桌宠快照、工具反馈和 Runtime 允许的工具；模型返回的单个工具调用交由 `AgentRuntime` 和 `AgentToolRouter` 校验、执行。适配器不保存跨请求对话，也不接入聊天界面。请求关闭思考和并行工具调用，以适配 V1 的时限与串行调用契约。
+`QwenModelAdapter` 把现有 `IAgentModelAdapter` 接到阿里云百炼北京地域的 `qwen3.8-flash` Chat Completions 接口。每轮只发送当前请求、桌宠快照、工具反馈和 Runtime 允许的工具；模型返回的单个工具调用交由 `AgentRuntime` 和 `AgentToolRouter` 校验、执行。适配器不保存跨请求对话；普通面板仅展示一次请求的结果。请求关闭思考和并行工具调用，以适配 V1 的时限与串行调用契约。
 
 API Key 只从运行进程的 `DASHSCOPE_API_KEY` 环境变量读取。请在 Windows 环境变量设置北京地域的百炼 API Key，重新打开终端后执行：
 
@@ -15,11 +23,11 @@ Get-Content .\output\qwen-agent-smoke.txt
 $run.ExitCode
 ```
 
-此显式联调模式用独立桌宠实例执行一次固定的 `set_action(Sit)` 请求，检查工具结果和模型最终回复，随后自动退出；不读写日常设置或学习记录。报告位于被 Git 忽略的 `output/qwen-agent-smoke.txt`，不包含 API Key。若没有配置 Key，联调在发起网络请求前失败。普通启动不会请求模型。自动测试使用假 HTTP 响应，不消耗真实 API 调用。
+此显式联调模式用独立桌宠实例执行一次固定的 `set_action(Sit)` 请求，检查工具结果和模型最终回复，随后自动退出；不读写日常设置或学习记录。报告位于被 Git 忽略的 `output/qwen-agent-smoke.txt`，不包含 API Key。若没有配置 Key，联调在发起网络请求前失败。普通启动仅在用户发送请求时访问模型。自动测试使用假 HTTP 响应，不消耗真实 API 调用。
 
 ## Agent Runtime V1
 
-`AgentRuntime.RunAsync(AgentRequest, CancellationToken)` 提供一次按需请求的完整循环：读取 `IAgentPetPort` 快照 → 将快照与工具定义交给 `IAgentModelAdapter` → 接收明确的 `ModelDecision.Final(...)` 或 `ModelDecision.Call(...)` → 校验并执行工具 → 重新读取状态，将结构化结果反馈给适配器 → 返回 `AgentRunResult`。最终回复只返回给调用方；只有模型显式调用 `speak` 才会显示宠物气泡。普通启动不会实例化模型适配器，也没有自动触发请求或聊天界面。
+`AgentRuntime.RunAsync(AgentRequest, CancellationToken)` 提供一次按需请求的完整循环：读取 `IAgentPetPort` 快照 → 将快照与工具定义交给 `IAgentModelAdapter` → 接收明确的 `ModelDecision.Final(...)` 或 `ModelDecision.Call(...)` → 校验并执行工具 → 重新读取状态，将结构化结果反馈给适配器 → 返回 `AgentRunResult`。最终回复只返回给调用方；只有模型显式调用 `speak` 才会显示宠物气泡。普通启动不会实例化模型适配器，也没有自动触发请求。
 
 `AgentToolRouter` 固定公开 `set_action`、`play_interaction`、`speak`、`set_automatic`、`start_study`、`end_study` 六种工具。每项都有 JSON 参数描述，Router 在调用 Port 前再次校验名称、参数类型、取值和请求级允许名单；模型无法通过工具名触及 UI、动画或底层字段。`play_interaction` 不允许伪造 `Petted`。调用方可以通过 `AgentRequest.AllowedTools` 缩小一次请求的工具范围；不指定时公开全部六项。
 
@@ -33,7 +41,7 @@ $run.ExitCode
 
 受控指令为 `SetActionAsync`、`PlayInteractionAsync`、`SpeakAsync`、`SetAutomaticAsync`、`StartStudyAsync` 和 `EndStudyAsync`，统一返回 `AgentCommandResult.Code`（`Applied`、`Busy`、`InvalidArgument`、`InvalidState`、`StorageUnavailable`、`ShuttingDown`）。动作选择与现有手动选动作一致，会关闭自由活动；互动保留自由活动设置。`Petted` 只代表真实用户触摸，Agent 不可触发。自定义气泡最多 80 字、两行，显示 6 秒；V1 不控制体型、速度、位置、置顶或随机聊天开关。
 
-用户拖动、现有互动、摸摸陪伴、显示中的气泡和学习完成提醒优先；Agent 指令遇到这些状态返回 `Busy`，不自动排队。学习进行中只允许结束学习；学习读写失败会报告 `StorageUnavailable`，不绕过原有保存规则。接口定义在 `src/AgentContracts.cs`，WPF 线程切换、快照组合与命令校验在 `src/AgentPort.cs`；实际行为继续走 `PetApp` 与 `StudyApp` 的现有入口。本版不接模型、不提供聊天 UI 或进程通信。
+用户拖动、现有互动、摸摸陪伴、显示中的气泡和学习完成提醒优先；Agent 指令遇到这些状态返回 `Busy`，不自动排队。学习进行中只允许结束学习；学习读写失败会报告 `StorageUnavailable`，不绕过原有保存规则。接口定义在 `src/AgentContracts.cs`，WPF 线程切换、快照组合与命令校验在 `src/AgentPort.cs`；实际行为继续走 `PetApp` 与 `StudyApp` 的现有入口。本版通过进程内面板调用，不提供进程通信。
 
 ## 学习陪伴模式 V1
 
@@ -294,4 +302,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test.ps1
 
 已人工查看面板、全部动作帧与六句气泡的渲染截图。原生鼠标拖动手势、多显示器热插拔、不同屏幕缩放比例与长时间运行仍建议在实际使用中继续验证。
 
-第十版增加学习陪伴、到期休息提醒与本地每日统计；第九版增加由精力与互动驱动的生命状态；第八版支持重启生效的本地角色素材包；第七版将角色文案、互动、气泡与精力节奏整理为内容配置包；第六版提供精力节奏与摸摸后的短暂陪伴，前一版提供两段多帧互动动画与本地鼠标感应。本项目不包含自由输入的 AI 对话、语音、联网功能或开机启动。猫咪为参考风格重新生成的角色素材，并非逐像素还原原图。
+第十版增加学习陪伴、到期休息提醒与本地每日统计；第九版增加由精力与互动驱动的生命状态；第八版支持重启生效的本地角色素材包；第七版将角色文案、互动、气泡与精力节奏整理为内容配置包；第六版提供精力节奏与摸摸后的短暂陪伴，前一版提供两段多帧互动动画与本地鼠标感应。第十一版增加用户主动触发的一次性 AI 交互；本项目尚不包含语音、长期记忆、主动 Agent 事件监听或开机启动。猫咪为参考风格重新生成的角色素材，并非逐像素还原原图。

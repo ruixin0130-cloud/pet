@@ -24,7 +24,7 @@ WindowStartupLocation="CenterScreen" Background="#F8F6F1" FontFamily="Microsoft 
 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="22"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <Grid>
 <StackPanel><TextBlock Text="T A M A G O   /   D E S K T O P   P E T" FontSize="10" Foreground="#89917B"/>
-<StackPanel Orientation="Horizontal" Margin="0,8,0,0"><TextBlock x:Name="PanelTitle" Text="玉子的小小世界" FontSize="26" FontWeight="SemiBold"/><Border Background="#ECEFE4" CornerRadius="8" Margin="14,5,0,5" Padding="10,4"><TextBlock Text="学习陪伴 · v0.10.0" Foreground="#748263" FontSize="10"/></Border></StackPanel>
+<StackPanel Orientation="Horizontal" Margin="0,8,0,0"><TextBlock x:Name="PanelTitle" Text="玉子的小小世界" FontSize="26" FontWeight="SemiBold"/><Border Background="#ECEFE4" CornerRadius="8" Margin="14,5,0,5" Padding="10,4"><TextBlock Text="Agent 交互 · v0.11.0" Foreground="#748263" FontSize="10"/></Border></StackPanel>
 <TextBlock x:Name="PanelSubtitle" Text="你忙你的，我会乖乖陪着你。" Margin="0,8,0,0" Foreground="#99938A" FontSize="12"/>
 </StackPanel>
 <Button x:Name="HidePanel" Content="收起面板 ↘" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,0,0" Padding="14,9" Background="#F8F6F1"/>
@@ -32,7 +32,7 @@ WindowStartupLocation="CenterScreen" Background="#F8F6F1" FontFamily="Microsoft 
 <Grid Grid.Row="2">
 <Grid.ColumnDefinitions><ColumnDefinition Width="280"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
 <Border Background="#F0EDE5" CornerRadius="20" Padding="22">
-<Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <StackPanel><TextBlock Text="今天也在你身边" Foreground="#898A79" FontSize="11"/><TextBlock Text="小猫一只，陪伴满格。" FontSize="17" Margin="0,8,0,0"/></StackPanel>
 <Grid Grid.Row="1">
 <Ellipse Fill="#E2DED1" Width="166" Height="20" VerticalAlignment="Bottom" Margin="0,0,0,24"/>
@@ -45,8 +45,19 @@ WindowStartupLocation="CenterScreen" Background="#F8F6F1" FontFamily="Microsoft 
 <Border Grid.Row="2" HorizontalAlignment="Center" Background="#FFFDFA" CornerRadius="12" Padding="13,8" Margin="0,0,0,20">
 <TextBlock x:Name="StatusLabel" Text="● 静静陪着你" Foreground="#7B886B" FontSize="12"/>
 </Border>
-<StackPanel Grid.Row="3"><TextBlock Text="“小小的陪伴，" Foreground="#9B9488" FontSize="14" HorizontalAlignment="Center"/>
-<TextBlock Text="也是大大的力量。”" Foreground="#9B9488" FontSize="14" HorizontalAlignment="Center" Margin="0,4,0,18"/>
+<Border Grid.Row="3" Background="#FFFDFA" BorderBrush="#E6DFD4" BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,0,0,12">
+<StackPanel>
+<TextBlock Text="和玉子说话" FontSize="13" FontWeight="SemiBold"/>
+<TextBox x:Name="AgentInput" MaxLength="1000" Height="54" Margin="0,9,0,8" Padding="7,5" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" ToolTip="输入请求，按 Ctrl+Enter 发送"/>
+<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+<Button x:Name="AgentSend" Content="发送给玉子" Background="#E1E8D5" BorderBrush="#98A487" Padding="8,7"/>
+<Button x:Name="AgentCancel" Grid.Column="2" Content="取消" IsEnabled="False" Padding="8,7"/>
+</Grid>
+<TextBlock x:Name="AgentStatus" Text="发送会调用 Qwen；不会自动监听桌面" FontSize="10" Foreground="#7B886B" TextWrapping="Wrap" Margin="0,9,0,0"/>
+<ScrollViewer MaxHeight="102" VerticalScrollBarVisibility="Auto" Margin="0,6,0,0"><TextBlock x:Name="AgentReply" TextWrapping="Wrap" FontSize="11" Foreground="#605C53"/></ScrollViewer>
+<TextBlock x:Name="AgentToolTrace" TextWrapping="Wrap" FontSize="10" Foreground="#8B857A" Margin="0,6,0,0"/>
+</StackPanel></Border>
+<StackPanel Grid.Row="4">
 <Border Height="1" Background="#DEDBD1" Margin="0,0,0,15"/>
 <TextBlock x:Name="DragHint" Text="拖动 · 把玉子放在喜欢的地方" Foreground="#989387" FontSize="10" HorizontalAlignment="Center"/>
 <TextBlock Text="单击摸摸  /  双击跳跃  /  右键菜单" Foreground="#989387" FontSize="10" HorizontalAlignment="Center" Margin="0,6,0,1"/></StackPanel>

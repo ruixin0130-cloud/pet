@@ -15,8 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.10.0.0")]
-[assembly: AssemblyFileVersion("0.10.0.0")]
+[assembly: AssemblyVersion("0.11.0.0")]
+[assembly: AssemblyFileVersion("0.11.0.0")]
 
 namespace Tamago {
     static class Program {
@@ -227,6 +227,7 @@ namespace Tamago {
             Find<Button>("HidePanel").Click+=delegate { panel.Hide(); };
             Find<Button>("FindPet").Click+=delegate { Home(); };
             Find<Button>("Quit").Click+=delegate { Quit(); };
+            InitializeAgentChat();
             sizeSlider.ValueChanged+=delegate {
                 if(!initialized)return;
                 double oldHeight=engine.WindowHeight,oldWidth=engine.WindowWidth;
@@ -615,6 +616,7 @@ namespace Tamago {
         }
         void Quit() {
             if(quitting)return;quitting=true;Save();
+            DisposeAgentChat();
             if(timer!=null)timer.Stop();
             if(tray!=null){tray.Visible=false;var icon=tray.Icon;tray.Dispose();if(icon!=null)icon.Dispose();}
             Shutdown();
@@ -674,6 +676,7 @@ namespace Tamago {
                 TestLifeUi(checks,output);
                 TestStudyUi(checks,output);
                 TestAgentPort(checks);
+                TestAgentChatUi(checks);
                 CaptureInteractionSheet(Path.Combine(output,"interaction-preview.png"));
                 CaptureInteractionAnimationSheet(Path.Combine(output,"interaction-animation-preview.png"));
                 TestGazeUi(checks);
