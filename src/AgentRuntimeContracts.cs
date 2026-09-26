@@ -45,6 +45,7 @@ namespace Tamago {
         }
     }
     public sealed class AgentModelTurn {
+        public ReadOnlyCollection<AgentConversationTurn> History { get; private set; }
         public string Input { get; private set; }
         public PetAgentSnapshot Snapshot { get; private set; }
         public ReadOnlyCollection<AgentToolDefinition> Tools { get; private set; }
@@ -52,7 +53,8 @@ namespace Tamago {
         public int TurnNumber { get; private set; }
         public bool FinalOnly { get; private set; }
         internal AgentModelTurn(string input,PetAgentSnapshot snapshot,ReadOnlyCollection<AgentToolDefinition> tools,
-            IList<AgentToolFeedback> feedback,int turnNumber,bool finalOnly) {
+            IList<AgentToolFeedback> feedback,int turnNumber,bool finalOnly,IEnumerable<AgentConversationTurn> history=null) {
+            History=AgentConversationSession.Bounded(history);
             Input=input;Snapshot=snapshot;Tools=tools;
             Feedback=new ReadOnlyCollection<AgentToolFeedback>(new List<AgentToolFeedback>(feedback));
             TurnNumber=turnNumber;FinalOnly=finalOnly;
@@ -65,7 +67,9 @@ namespace Tamago {
     public sealed class AgentRequest {
         public string Input { get; private set; }
         public ReadOnlyCollection<string> AllowedTools { get; private set; }
-        public AgentRequest(string input,IEnumerable<string> allowedTools=null) {
+        public ReadOnlyCollection<AgentConversationTurn> History { get; private set; }
+        public AgentRequest(string input,IEnumerable<string> allowedTools=null,IEnumerable<AgentConversationTurn> history=null) {
+            History=AgentConversationSession.Bounded(history);
             Input=input;
             AllowedTools=allowedTools==null?null:new ReadOnlyCollection<string>(new List<string>(allowedTools));
         }

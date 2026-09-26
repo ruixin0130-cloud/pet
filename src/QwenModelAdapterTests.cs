@@ -156,6 +156,32 @@ namespace Tamago {
                     "Qwen HTTP delay obeys the runtime model time budget");
             }
 
+            AgentConversationTurn past=new AgentConversationTurn("坐下",new AgentRunResult(AgentRunCode.Cancelled,
+                "已取消，但坐下已执行。",Snapshot(PetAction.Sit),new [] {
+                    new AgentToolFeedback("old-call","set_action",AgentToolCode.Applied,Snapshot(PetAction.Sit))},2));
+            handler=new FakeHandler();handler.Reply=delegate {return Task.FromResult(Json(FinalResponse));};
+            using(HttpClient http=new HttpClient(handler)) {
+                QwenModelAdapter adapter=new QwenModelAdapter(http,"unit-test-placeholder");
+                AgentModelTurn withHistory=new AgentModelTurn("然后呢",Snapshot(PetAction.Sleep),
+                    new AgentToolRouter().DefinitionsFor(null),new List<AgentToolFeedback>(),1,false,new [] {past});
+                adapter.NextAsync(withHistory,CancellationToken.None).GetAwaiter().GetResult();
+                var payload=ParseObject(handler.Bodies[0]);
+                object[] messages=(object[])payload["messages"];
+                var context=ParseObject((string)Dict(messages[1])["content"]);
+                object[] history=(object[])context["history"];
+                var historyItem=Dict(history[0]);
+                check(history.Length==1&&(string)historyItem["status"]=="Cancelled"&&
+                    !historyItem.ContainsKey("snapshot")&&!handler.Bodies[0].Contains("old-call")&&
+                    (string)Dict(context["snapshot"])["action"]=="Sleep"&&messages.Length==2&&
+                    !handler.Bodies[0].Contains("unit-test-placeholder"),
+                    "Qwen sends bounded historical results as data, keeps live state and excludes secrets and call IDs");
+                adapter.NextAsync(Turn(),CancellationToken.None).GetAwaiter().GetResult();
+                payload=ParseObject(handler.Bodies[1]);messages=(object[])payload["messages"];
+                context=ParseObject((string)Dict(messages[1])["content"]);
+                check(((object[])context["history"]).Length==0,
+                    "Qwen adapter has no hidden history between independent calls");
+            }
+
             bool missing=false;
             using(HttpClient http=new HttpClient(new FakeHandler())) {
                 try {new QwenModelAdapter(http," ");}catch(InvalidOperationException) {missing=true;}

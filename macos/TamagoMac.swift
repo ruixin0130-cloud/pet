@@ -307,6 +307,7 @@ private final class PetView: NSView {
     private var controller: PetController?
     private var statusItem: NSStatusItem?
     private var agentUI: MacAgentUI?
+    private let conversation = MacConversationSession()
     private var agentTask: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -326,7 +327,7 @@ private final class PetView: NSView {
             guard let resources = Bundle.main.resourceURL else { throw CocoaError(.fileNoSuchFile) }
             let sprites = try SpriteLibrary(resources: resources)
             controller = try PetController(sprites: sprites, menu: menu)
-            agentUI = MacAgentUI()
+            agentUI = MacAgentUI(session: conversation)
             agentUI?.onSend = { [weak self] text in self?.sendToAgent(text) }
             agentUI?.onCancel = { [weak self] in self?.agentTask?.cancel() }
             agentUI?.onSetKey = { [weak self] in self?.setAPIKey() }
@@ -387,10 +388,12 @@ private final class PetView: NSView {
             return
         }
         let runtime = MacAgentRuntime(port: controller, model: MacQwenAdapter(apiKey: key))
+        guard let request = conversation.begin(input) else { return }
         agentUI.setRunning(true)
         agentTask = Task { [weak self] in
-            let result = await runtime.run(input)
+            let result = await runtime.run(request.input, history: request.history)
             guard let self else { return }
+            self.conversation.complete(request, result: result)
             agentUI.showResult(result)
             agentUI.setRunning(false)
             self.agentTask = nil

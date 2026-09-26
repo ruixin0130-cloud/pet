@@ -124,7 +124,7 @@ namespace Tamago {
                     bool finalOnly=terminal.HasValue||trace.Count>=MaxToolCalls;
                     AgentModelTurn modelTurn=new AgentModelTurn(request.Input,snapshot,
                         finalOnly?new ReadOnlyCollection<AgentToolDefinition>(new List<AgentToolDefinition>()):tools,
-                        trace,turn,finalOnly);
+                        trace,turn,finalOnly,request.History);
                     ModelDecision decision;
                     Stopwatch modelClock=Stopwatch.StartNew();
                     turns++;

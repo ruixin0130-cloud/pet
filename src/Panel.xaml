@@ -24,7 +24,7 @@ WindowStartupLocation="CenterScreen" Background="#F8F6F1" FontFamily="Microsoft 
 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="22"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 <Grid>
 <StackPanel><TextBlock Text="T A M A G O   /   D E S K T O P   P E T" FontSize="10" Foreground="#89917B"/>
-<StackPanel Orientation="Horizontal" Margin="0,8,0,0"><TextBlock x:Name="PanelTitle" Text="玉子的小小世界" FontSize="26" FontWeight="SemiBold"/><Border Background="#ECEFE4" CornerRadius="8" Margin="14,5,0,5" Padding="10,4"><TextBlock Text="Agent 交互 · v0.11.0" Foreground="#748263" FontSize="10"/></Border></StackPanel>
+<StackPanel Orientation="Horizontal" Margin="0,8,0,0"><TextBlock x:Name="PanelTitle" Text="玉子的小小世界" FontSize="26" FontWeight="SemiBold"/><Border Background="#ECEFE4" CornerRadius="8" Margin="14,5,0,5" Padding="10,4"><TextBlock Text="连续对话 · Agent V1.2" Foreground="#748263" FontSize="10"/></Border></StackPanel>
 <TextBlock x:Name="PanelSubtitle" Text="你忙你的，我会乖乖陪着你。" Margin="0,8,0,0" Foreground="#99938A" FontSize="12"/>
 </StackPanel>
 <Button x:Name="HidePanel" Content="收起面板 ↘" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,0,0" Padding="14,9" Background="#F8F6F1"/>
@@ -49,12 +49,13 @@ WindowStartupLocation="CenterScreen" Background="#F8F6F1" FontFamily="Microsoft 
 <StackPanel>
 <TextBlock Text="和玉子说话" FontSize="13" FontWeight="SemiBold"/>
 <TextBox x:Name="AgentInput" MaxLength="1000" Height="54" Margin="0,9,0,8" Padding="7,5" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" ToolTip="输入请求，按 Ctrl+Enter 发送"/>
-<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+<Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
 <Button x:Name="AgentSend" Content="发送给玉子" Background="#E1E8D5" BorderBrush="#98A487" Padding="8,7"/>
 <Button x:Name="AgentCancel" Grid.Column="2" Content="取消" IsEnabled="False" Padding="8,7"/>
+<Button x:Name="AgentClear" Grid.Column="4" Content="清空对话" Padding="8,7"/>
 </Grid>
-<TextBlock x:Name="AgentStatus" Text="发送会调用 Qwen；不会自动监听桌面" FontSize="10" Foreground="#7B886B" TextWrapping="Wrap" Margin="0,9,0,0"/>
-<ScrollViewer MaxHeight="102" VerticalScrollBarVisibility="Auto" Margin="0,6,0,0"><TextBlock x:Name="AgentReply" TextWrapping="Wrap" FontSize="11" Foreground="#605C53"/></ScrollViewer>
+<TextBlock x:Name="AgentStatus" Text="最近 6 轮会随追问发送给 Qwen；退出应用后清空" FontSize="10" Foreground="#7B886B" TextWrapping="Wrap" Margin="0,9,0,0"/>
+<ScrollViewer x:Name="AgentHistoryScroll" MaxHeight="102" VerticalScrollBarVisibility="Auto" Margin="0,6,0,0"><TextBlock x:Name="AgentReply" TextWrapping="Wrap" FontSize="11" Foreground="#605C53"/></ScrollViewer>
 <TextBlock x:Name="AgentToolTrace" TextWrapping="Wrap" FontSize="10" Foreground="#8B857A" Margin="0,6,0,0"/>
 </StackPanel></Border>
 <StackPanel Grid.Row="4">

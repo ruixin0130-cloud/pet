@@ -58,7 +58,7 @@ enum MacModelError: Error {
 }
 
 @MainActor protocol MacAgentModel {
-    func next(input: String, snapshot: MacPetSnapshot, feedback: [MacToolFeedback],
+    func next(input: String, history: [MacConversationTurn], snapshot: MacPetSnapshot, feedback: [MacToolFeedback],
               turn: Int, finalOnly: Bool, timeout: TimeInterval) async throws -> MacModelDecision
 }
 
@@ -111,7 +111,8 @@ enum MacModelError: Error {
         return !normalized.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) && $0 != "\n" }
     }
 
-    func run(_ request: String) async -> MacAgentResult {
+    func run(_ request: String, history: [MacConversationTurn] = []) async -> MacAgentResult {
+        let history = MacConversationSession.bounded(history)
         let input = request.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty, input.count <= 1000 else {
             return result(.invalidRequest, "请输入 1–1000 字的请求。", [])
@@ -130,7 +131,7 @@ enum MacModelError: Error {
             let finalOnly = trace.count >= Self.maxTools
             let decision: MacModelDecision
             do {
-                decision = try await model.next(input: input, snapshot: port.snapshot(), feedback: trace,
+                decision = try await model.next(input: input, history: history, snapshot: port.snapshot(), feedback: trace,
                                                 turn: turn, finalOnly: finalOnly, timeout: remaining)
             } catch is CancellationError {
                 return result(.cancelled, "请求已取消；已执行的操作见记录。", trace)

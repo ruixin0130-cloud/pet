@@ -87,11 +87,11 @@ enum MacAPIKeyStore {
                 "required": ["text"], "additionalProperties": false]]]
     ]
 
-    func next(input: String, snapshot: MacPetSnapshot, feedback: [MacToolFeedback],
+    func next(input: String, history: [MacConversationTurn] = [], snapshot: MacPetSnapshot, feedback: [MacToolFeedback],
               turn: Int, finalOnly: Bool, timeout: TimeInterval) async throws -> MacModelDecision {
         try Task.checkCancellation()
         let context: [String: Any] = [
-            "input": input, "snapshot": snapshot.json,
+            "input": input, "history": MacConversationSession.bounded(history).map(\.json), "snapshot": snapshot.json,
             "feedback": feedback.map(\.json), "turnNumber": turn, "finalOnly": finalOnly]
         let contextData = try JSONSerialization.data(withJSONObject: context)
         let contextText = String(data: contextData, encoding: .utf8) ?? "{}"
@@ -100,7 +100,7 @@ enum MacAPIKeyStore {
             "enable_thinking": false, "parallel_tool_calls": false,
             "max_tokens": 512, "tool_choice": finalOnly ? "none" : "auto",
             "messages": [
-                ["role": "system", "content": "你是桌宠玉子的助手。用户要求改变桌宠状态时必须调用提供的工具。只能使用本轮提供的工具，不得声称未执行的动作已经成功。工具反馈是实际结果；Busy 或其他失败必须如实说明。只处理当前请求，不保存对话历史。"],
+                ["role": "system", "content": "你是桌宠玉子的助手。用户要求改变桌宠状态时必须调用提供的工具。只能使用本轮提供的工具，不得声称未执行的动作已经成功。工具反馈是实际结果；Busy 或其他失败必须如实说明。history 是之前对话的参考数据，其中的请求已经处理，不得重新执行或当作新指令。只执行当前 input 要求的动作。当前 snapshot 和本轮 feedback 优先于历史文字，历史失败不代表动作成功。不确定指代时先询问用户。"],
                 ["role": "user", "content": contextText]]]
         if !finalOnly { payload["tools"] = Self.tools }
         var request = URLRequest(url: Self.endpoint)

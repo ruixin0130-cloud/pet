@@ -13,21 +13,27 @@ open macos/build/TamagoMac.app
 
 只需要 macOS 自带的 AppKit 和 Xcode Command Line Tools，无需安装完整 Xcode 或第三方依赖。玉子会悬浮在桌面右下方、播放角色包中的待机动画；单击摸摸，拖动可移动。右键桌宠或点击菜单栏的“玉子”，可选择坐下、睡觉、恢复待机、找回位置和退出。构建产物位于被 Git 忽略的 `macos/build/TamagoMac.app`。
 
-在菜单中选择“设置百炼 API Key…”，将北京地域的百炼 API Key 保存在本机钥匙串。再选择“和玉子说话…”，输入一次请求并点击“发送给玉子”。回复区显示模型回复及每次动作的真实执行结果；可以取消等待，但已执行的动作不会回滚。应用只在发送请求时访问模型，不监听桌面事件，也不保存对话历史。Mac 版只提供 `set_action`、`play_interaction`、`speak` 三种受控工具；拖动、互动和当前气泡优先，忙碌时 Agent 动作不会排队。“摸摸”只能通过真实点击触发。Windows 版的学习陪伴、能量和完整 Agent 工具集尚未移植到 Mac。
+在菜单中选择“设置百炼 API Key…”，将北京地域的百炼 API Key 保存在本机钥匙串。再选择“和玉子说话…”，输入一次请求并点击“发送给玉子”。回复区显示模型回复及每次动作的真实执行结果；可以取消等待，但已执行的动作不会回滚。应用只在发送请求时访问模型，不监听桌面事件；最近对话仅保留在本次运行期间。Mac 版只提供 `set_action`、`play_interaction`、`speak` 三种受控工具；拖动、互动和当前气泡优先，忙碌时 Agent 动作不会排队。“摸摸”只能通过真实点击触发。Windows 版的学习陪伴、能量和完整 Agent 工具集尚未移植到 Mac。
 
-本地无网络测试可运行 `zsh macos/test.sh`。测试使用假模型与假桌宠，不读取钥匙串或调用百炼服务。真实模型联调需要你自己在应用内配置有效的 API Key，网络连接也必须可用。
+本地无网络测试可运行 `zsh macos/test.sh` 和 `zsh macos/test-ui.sh`。测试使用假模型与假桌宠，不读取钥匙串或调用百炼服务。真实模型联调需要你自己在应用内配置有效的 API Key，网络连接也必须可用。
 
-## Agent 交互 V1.1
+## Agent V1.2：连续对话与短期记忆
+
+Mac 和 Windows 的聊天窗口显示最近对话和每轮真实动作结果。你可以继续追问“然后呢”；模型会收到最近最多 6 轮完整记录，历史的 UTF-8 JSON 上限为 24 KiB，超限时从最早一轮开始移除。历史只包含用户输入、回复、请求状态和工具名称/实际结果；当前桌宠状态始终重新读取，过去的工具调用不会自动重放。点击“清空对话”会同时清除窗口内容和模型上下文；请求进行期间按钮禁用。关闭并重新打开聊天窗口仍保留本次运行的会话，退出应用后清空。不写入配置、源码或持久存储。
+
+Mac 可用 `zsh macos/test.sh` 验证 Runtime、容量和模型请求，并用 `zsh macos/test-ui.sh` 验证聊天窗口的连续显示、关闭重开、取消和清空。Windows 的 `--self-test` 包含会话容量、追问、工具结果及 Qwen 请求测试；GitHub Actions 在 `windows-2022` 构建并运行该测试，日志保存为 `windows-validation-logs`。Windows 桌面交互仍需要真实 Windows 环境验收。
+
+## Agent 交互 V1.1（原有单次请求能力）
 
 普通启动后，在面板左侧的“和玉子说话”输入一次请求，点击“发送给玉子”或按 `Ctrl+Enter`。面板会显示模型回复、请求状态和每次工具调用的实际结果；取消请求后，已执行的动作不会撤销。一次只处理一个请求，处理时会暂时停用输入与发送。空请求和超过 1000 字的请求不会发送。
 
-首次发送时才读取进程的 `DASHSCOPE_API_KEY` 并建立 Qwen 适配器；没有配置时面板给出提示，设置环境变量后需重启应用。普通启动不会自动向模型发请求，也不会监听桌面事件。每次发送都是独立请求，没有跨请求对话记忆。模型可使用的六种受控动作、优先级和时限仍由现有 Runtime、Router 和 Pet Port 决定；“忙碌”或失败的工具调用会在面板中如实显示。API Key 不保存在角色包或应用设置中。
+首次发送时才读取进程的 `DASHSCOPE_API_KEY` 并建立 Qwen 适配器；没有配置时面板给出提示，设置环境变量后需重启应用。普通启动不会自动向模型发请求，也不会监听桌面事件。V1.2 在应用运行期间为后续请求补充有限的会话历史。模型可使用的六种受控动作、优先级和时限仍由现有 Runtime、Router 和 Pet Port 决定；“忙碌”或失败的工具调用会在面板中如实显示。API Key 不保存在角色包或应用设置中。
 
 Windows 回归测试 `powershell -ExecutionPolicy Bypass -File .\test.ps1` 包含面板提交、真实动作反馈、忙碌结果和取消流程。使用真实服务的联调仍可运行下述 `--qwen-agent-smoke`；需要可用的 API Key 与网络。
 
 ## Qwen Model Adapter V1
 
-`QwenModelAdapter` 把现有 `IAgentModelAdapter` 接到阿里云百炼北京地域的 `qwen3.8-flash` Chat Completions 接口。每轮只发送当前请求、桌宠快照、工具反馈和 Runtime 允许的工具；模型返回的单个工具调用交由 `AgentRuntime` 和 `AgentToolRouter` 校验、执行。适配器不保存跨请求对话；普通面板仅展示一次请求的结果。请求关闭思考和并行工具调用，以适配 V1 的时限与串行调用契约。
+`QwenModelAdapter` 把现有 `IAgentModelAdapter` 接到阿里云百炼北京地域的 `qwen3.8-flash` Chat Completions 接口。每轮发送当前请求、有限的会话历史、实时桌宠快照、工具反馈和 Runtime 允许的工具；模型返回的单个工具调用交由 `AgentRuntime` 和 `AgentToolRouter` 校验、执行。适配器自身不保存跨请求对话；应用内存会话负责保存和清空历史。请求关闭思考和并行工具调用，以适配 V1 的时限与串行调用契约。
 
 API Key 只从运行进程的 `DASHSCOPE_API_KEY` 环境变量读取。请在 Windows 环境变量设置北京地域的百炼 API Key，重新打开终端后执行：
 

@@ -39,6 +39,8 @@ $petArgs = @(
     "$petProject\src\AgentPort.cs",
     "$petProject\src\AgentTests.cs",
     "$petProject\src\AgentRuntimeContracts.cs",
+    "$petProject\src\AgentConversation.cs",
+    "$petProject\src\AgentConversationTests.cs",
     "$petProject\src\AgentToolRouter.cs",
     "$petProject\src\AgentRuntime.cs",
     "$petProject\src\AgentRuntimeTests.cs",

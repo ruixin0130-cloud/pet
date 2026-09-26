@@ -232,6 +232,33 @@ namespace Tamago {
             blocked.SetResult(ModelDecision.Final("完成。"));result=pending.Result;
             check(concurrent.Code==AgentRunCode.Busy&&result.Code==AgentRunCode.Completed&&model.Turns.Count==1,
                 "runtime accepts only one in-flight request");
+
+            AgentConversationSession conversation=new AgentConversationSession();
+            AgentRequest conversationRequest;
+            conversation.TryBegin("请坐下陪我",out conversationRequest);
+            port=new FakePort();model=new FakeModel();
+            model.Then(Call("history-action","set_action","{\"action\":\"Sit\"}"));
+            model.Then(ModelDecision.Final("坐好陪你了。"));
+            result=Runtime(port,model).RunAsync(conversationRequest,CancellationToken.None).Result;
+            conversation.Complete(conversationRequest,result);
+            port.Snapshot=State(PetAction.Sleep,AgentStudyPhase.None);
+            conversation.TryBegin("现在呢",out conversationRequest);
+            model=new FakeModel();model.Then(ModelDecision.Final("现在在睡觉。"));
+            result=Runtime(port,model).RunAsync(conversationRequest,CancellationToken.None).Result;
+            check(model.Turns[0].History.Count==1&&model.Turns[0].History[0].Input=="请坐下陪我"&&
+                model.Turns[0].History[0].Tools[0].Code==AgentToolCode.Applied&&
+                model.Turns[0].Snapshot.Action==PetAction.Sleep&&port.Calls==1,
+                "follow-up receives history, uses current state and does not replay historical tools");
+            conversation.Complete(conversationRequest,result);
+            conversation.TryBegin("趴下",out conversationRequest);
+            model=new FakeModel();
+            model.Then(Call("new-action","set_action","{\"action\":\"Lie\"}"));
+            model.Then(ModelDecision.Final("趴下了。"));
+            result=Runtime(port,model).RunAsync(conversationRequest,CancellationToken.None).Result;
+            check(model.Turns[0].History.Count==2&&model.Turns[1].History.Count==2&&
+                model.Turns[0].History[0]==model.Turns[1].History[0]&&model.Turns[1].Snapshot.Action==PetAction.Lie,
+                "all model decisions share the same captured history while current tool state advances");
+            conversation.Complete(conversationRequest,result);
         }
     }
 }

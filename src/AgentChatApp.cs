@@ -9,7 +9,8 @@ using System.Windows.Input;
 namespace Tamago {
     public sealed partial class PetApp {
         TextBox agentInput;
-        Button agentSend,agentCancel;
+        Button agentSend,agentCancel,agentClear;
+        readonly AgentConversationSession agentConversation=new AgentConversationSession();
         TextBlock agentStatus,agentReply,agentToolTrace;
         AgentRuntime agentRuntime;
         QwenModelAdapter agentAdapter;
@@ -21,6 +22,8 @@ namespace Tamago {
             agentInput=Find<TextBox>("AgentInput");
             agentSend=Find<Button>("AgentSend");
             agentCancel=Find<Button>("AgentCancel");
+            agentClear=Find<Button>("AgentClear");
+            agentClear.Click+=delegate { ClearAgentConversation(); };
             agentStatus=Find<TextBlock>("AgentStatus");
             agentReply=Find<TextBlock>("AgentReply");
             agentToolTrace=Find<TextBlock>("AgentToolTrace");
@@ -39,6 +42,24 @@ namespace Tamago {
             };
         }
 
+        void ClearAgentConversation() {
+            if(!agentConversation.Clear())return;
+            agentInput.Clear();
+            RenderAgentConversation();
+            agentToolTrace.Text="";
+            agentStatus.Text="对话已清空，下一条消息将开始新会话。";
+        }
+        void RenderAgentConversation() {
+            List<string> entries=new List<string>();
+            foreach(AgentConversationTurn turn in agentConversation.Turns) {
+                List<string> tools=new List<string>();
+                foreach(AgentConversationTool tool in turn.Tools)tools.Add(tool.Name+" · "+tool.Code);
+                entries.Add("你："+turn.Input+"\n玉子："+turn.Reply+"\n状态："+turn.Status+
+                    "\n实际动作："+(tools.Count==0?"无":String.Join("；",tools.ToArray())));
+            }
+            agentReply.Text=String.Join("\n\n────────\n\n",entries.ToArray());
+            Find<ScrollViewer>("AgentHistoryScroll").ScrollToEnd();
+        }
         static string AgentStatusFor(AgentRunResult result) {
             switch(result.Code) {
                 case AgentRunCode.Completed:
@@ -83,28 +104,34 @@ namespace Tamago {
                     return null;
                 }
             }
+            AgentRequest request;
+            if(!agentConversation.TryBegin(input,out request))return null;
             agentRunning=true;
             agentCancellation=new CancellationTokenSource();
             CancellationTokenSource requestCancellation=agentCancellation;
             agentSend.IsEnabled=false;
             agentInput.IsEnabled=false;
             agentCancel.IsEnabled=true;
+            agentClear.IsEnabled=false;
             agentStatus.Text="正在处理请求…";
-            agentReply.Text="";
             agentToolTrace.Text="";
             try {
-                AgentRunResult result=await agentRuntime.RunAsync(new AgentRequest(input),requestCancellation.Token);
+                AgentRunResult result=await agentRuntime.RunAsync(request,requestCancellation.Token);
+                agentConversation.Complete(request,result);
                 if(!quitting) {
                     agentStatus.Text=AgentStatusFor(result);
-                    agentReply.Text=result.Reply??"";
+                    RenderAgentConversation();
                     agentToolTrace.Text=AgentTraceFor(result);
                     if(result.Code==AgentRunCode.Completed)agentInput.Clear();
                 }
                 return result;
             } catch(Exception) {
+                AgentRunResult unknown=new AgentRunResult(AgentRunCode.ToolFailure,
+                    "请求处理失败，执行结果未知；请先检查桌宠状态。",null,new List<AgentToolFeedback>(),0);
+                agentConversation.Complete(request,unknown);
                 if(!quitting) {
                     agentStatus.Text="请求处理失败，请稍后重试。";
-                    agentReply.Text="";
+                    RenderAgentConversation();
                     agentToolTrace.Text="执行结果未知；请先检查桌宠状态。";
                 }
                 return null;
@@ -116,6 +143,7 @@ namespace Tamago {
                     agentSend.IsEnabled=true;
                     agentInput.IsEnabled=true;
                     agentCancel.IsEnabled=false;
+                    agentClear.IsEnabled=true;
                 }
             }
         }

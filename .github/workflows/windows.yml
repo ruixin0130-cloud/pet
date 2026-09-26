@@ -1,0 +1,40 @@
+name: Windows build and logic tests
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build WPF application
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force output | Out-Null
+          & .\build.ps1 *>&1 | Tee-Object -FilePath output/build.txt
+      - name: Run offline logic and adapter tests
+        shell: powershell
+        run: |
+          $test = Start-Process -FilePath .\bin\Tamago.exe -ArgumentList '--self-test' -PassThru
+          if (-not $test.WaitForExit(60000)) {
+            Stop-Process -Id $test.Id
+            throw 'Logic tests timed out.'
+          }
+          if ($test.ExitCode -ne 0) { throw "Logic tests failed ($($test.ExitCode))." }
+          Get-Content output/engine-tests.txt
+      - name: Save validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-validation-logs
+          path: output/*.txt
+          retention-days: 7
+          if-no-files-found: warn

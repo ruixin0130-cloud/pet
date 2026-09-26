@@ -124,7 +124,7 @@ namespace Tamago {
             AgentRunResult result=WaitForAgent(agentPending);
             if(result==null||result.Code!=AgentRunCode.Completed||result.ToolTrace.Count!=1||
                 result.ToolTrace[0].Code!=AgentToolCode.Applied||engine.Action!=PetAction.Sit||
-                agentReply.Text!="玉子已经坐好了。"||agentInput.Text!=""||!agentSend.IsEnabled||agentCancel.IsEnabled)
+                !agentReply.Text.Contains("玉子已经坐好了。")||!agentReply.Text.Contains("你：请坐下")||agentInput.Text!=""||!agentSend.IsEnabled||agentCancel.IsEnabled)
                 throw new Exception("Agent 面板未显示真实的动作执行结果");
 
             bubbleUntil=clock.Elapsed.TotalSeconds+8;
@@ -156,11 +156,18 @@ namespace Tamago {
             agentRuntime=new AgentRuntime(this,model);
             agentInput.Text="等待取消";
             agentSend.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            if(agentSend.IsEnabled||!agentCancel.IsEnabled)throw new Exception("Agent 请求处理中未锁定重复提交");
+            if(agentSend.IsEnabled||!agentCancel.IsEnabled||agentClear.IsEnabled)throw new Exception("Agent 请求处理中未锁定重复提交");
             agentCancel.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             result=WaitForAgent(agentPending);
             if(result==null||result.Code!=AgentRunCode.Cancelled||!agentSend.IsEnabled||agentCancel.IsEnabled||
                 agentInput.Text!="等待取消")throw new Exception("Agent 面板取消后未恢复输入");
+            string transcript=agentReply.Text;
+            panel.Hide();panel.Show();
+            if(agentReply.Text!=transcript||agentConversation.Turns.Count!=4||!agentReply.Text.Contains("请坐下")||
+                !agentReply.Text.Contains("等待取消"))throw new Exception("收起面板丢失了对话");
+            agentClear.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if(agentConversation.Turns.Count!=0||agentReply.Text!=""||!agentClear.IsEnabled)
+                throw new Exception("清空未同时清除界面和会话");
             agentRuntime=null;
             agentInput.Clear();agentReply.Text="";agentToolTrace.Text="";
             agentStatus.Text="发送会调用 Qwen；不会自动监听桌面";
