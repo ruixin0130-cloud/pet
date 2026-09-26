@@ -14,7 +14,9 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Build WPF application
         shell: powershell
         run: |
@@ -32,7 +34,7 @@ jobs:
           Get-Content output/engine-tests.txt
       - name: Save validation logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-validation-logs
           path: output/*.txt
