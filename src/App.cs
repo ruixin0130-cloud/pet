@@ -15,8 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.11.0.0")]
-[assembly: AssemblyFileVersion("0.11.0.0")]
+[assembly: AssemblyVersion("0.12.0.0")]
+[assembly: AssemblyFileVersion("0.12.0.0")]
 
 namespace Tamago {
     static class Program {
@@ -78,6 +78,7 @@ namespace Tamago {
         PetAssets assets;
 
         Window pet,panel;
+        PanelTheme panelTheme;
         Canvas canvas;
         Image petImage,previewImage;
         Border bubble,previewBubble;
@@ -188,6 +189,13 @@ namespace Tamago {
         }
         T Find<T>(string name) where T:class { return panel.FindName(name) as T; }
         static SolidColorBrush Brush(string color) { return (SolidColorBrush)new BrushConverter().ConvertFromString(color); }
+        static void SetSelectionStyle(Button button,bool selected) {
+            if(button.Tag is bool&&(bool)button.Tag==selected)return;
+            button.Tag=selected;
+            button.SetResourceReference(Control.BackgroundProperty,selected?"AccentSoftBrush":"SurfaceBrush");
+            button.SetResourceReference(Control.BorderBrushProperty,selected?"AccentBrush":"BorderBrush");
+            button.SetResourceReference(Control.ForegroundProperty,selected?"SelectedTextBrush":"TextPrimaryBrush");
+        }
         static void SetButtonLabel(Button button,string label) {
             StackPanel content=button.Content as StackPanel;
             if(content!=null&&content.Children.Count>0) { TextBlock text=content.Children[content.Children.Count-1] as TextBlock; if(text!=null){text.Text=label;text.TextWrapping=TextWrapping.Wrap;text.TextAlignment=TextAlignment.Center;text.FontSize=11;} }
@@ -196,9 +204,21 @@ namespace Tamago {
         void CreatePanel() {
             using(Stream input=Assembly.GetExecutingAssembly().GetManifestResourceStream("Panel.xaml"))
                 panel=(Window)XamlReader.Load(input);
+            Rect work=SystemParameters.WorkArea;
+            panel.MinWidth=Math.Min(panel.MinWidth,Math.Max(600,work.Width-24));
+            panel.MinHeight=Math.Min(panel.MinHeight,Math.Max(340,work.Height-24));
+            panel.Width=Math.Min(panel.Width,Math.Max(panel.MinWidth,work.Width-24));
+            panel.Height=Math.Min(panel.Height,Math.Max(panel.MinHeight,work.Height-24));
+            panelTheme=new PanelTheme(panel);
+            panel.SizeChanged+=delegate {
+                bool compact=panel.ActualHeight<560;
+                Find<Grid>("PreviewStage").Height=compact?102:172;
+                previewImage.Width=previewImage.Height=compact?100:164;
+                panelSubtitle.Visibility=compact?Visibility.Collapsed:Visibility.Visible;
+            };
             panelTitle=Find<TextBlock>("PanelTitle");panelSubtitle=Find<TextBlock>("PanelSubtitle");
-            panel.Title=profile.CharacterName+" · 小小的陪伴";
-            panelTitle.Text=profile.CharacterName+"的小小世界";
+            panel.Title=profile.CharacterName+" · Agent 工作台";
+            panelTitle.Text=profile.CharacterName;
             panelSubtitle.Text=profile.CharacterName+"会乖乖陪着你。";
             Find<TextBlock>("PackStatus").Text=assets.Error??("当前角色："+profile.CharacterName+" · 重启后应用素材包" );
             Find<TextBlock>("DragHint").Text="拖动 · 把"+profile.CharacterName+"放在喜欢的地方";
@@ -229,7 +249,15 @@ namespace Tamago {
             }
             autoButton=Find<Button>("ActionAuto");
             autoButton.Click+=delegate { SetAutomaticMode(!engine.Automatic,true); };
-            Find<Button>("HidePanel").Click+=delegate { panel.Hide(); };
+            Find<Button>("PanelClose").Click+=delegate { panel.Hide(); };
+            Find<Button>("PanelMinimize").Click+=delegate { panel.WindowState=WindowState.Minimized; };
+            Find<Button>("PanelZoom").Click+=delegate {
+                panel.WindowState=panel.WindowState==WindowState.Maximized?WindowState.Normal:WindowState.Maximized;
+            };
+            Find<Button>("NavChat").Click+=delegate { SelectPanelPage("Chat"); };
+            Find<Button>("NavActions").Click+=delegate { SelectPanelPage("Actions"); };
+            Find<Button>("NavPreferences").Click+=delegate { SelectPanelPage("Preferences"); };
+            SelectPanelPage("Chat");
             Find<Button>("FindPet").Click+=delegate { Home(); };
             Find<Button>("Quit").Click+=delegate { Quit(); };
             InitializeAgentChat();
@@ -254,6 +282,13 @@ namespace Tamago {
                     if((uint)msg==Native.ShowMessage){ShowPanel();handled=true;} return IntPtr.Zero;
                 });
             };
+        }
+        void SelectPanelPage(string page) {
+            foreach(string name in new [] {"Chat","Actions","Preferences"}) {
+                bool selected=name==page;
+                Find<Grid>(name+"Page").Visibility=selected?Visibility.Visible:Visibility.Collapsed;
+                Find<Button>("Nav"+name).Tag=selected?"Selected":null;
+            }
         }
         void CreatePet(bool topmost) {
             pet=new Window { Width=engine.WindowWidth,Height=engine.WindowHeight,WindowStyle=WindowStyle.None,
@@ -592,19 +627,16 @@ namespace Tamago {
             sizeValue.Text=((int)engine.Size)+" px";speedValue.Text=engine.Speed<55?"慢悠悠":engine.Speed>110?"轻快":"悠闲";
             foreach(KeyValuePair<PetAction,Button> item in actionButtons) {
                 bool selected=!engine.Automatic&&engine.Action==item.Key;
-                item.Value.Background=Brush(selected?"#EDF0E5":"#FFFFFF");
-                item.Value.BorderBrush=Brush(selected?"#A2AE91":"#E8E5DC");
+                SetSelectionStyle(item.Value,selected);
                 item.Value.IsEnabled=!StudyBusy;
             }
-            autoButton.Background=Brush(engine.Automatic?"#E1E8D5":"#FFFFFF");
-            autoButton.BorderBrush=Brush(engine.Automatic?"#98A487":"#E8E5DC");
+            SetSelectionStyle(autoButton,engine.Automatic);
             autoButton.IsEnabled=!StudyBusy;Find<Button>("SpeakNow").IsEnabled=!StudyBusy;
             energyBar.Value=engine.Energy;energyValue.Text=((int)Math.Round(engine.Energy))+"%";
             lifeStateValue.Text="状态 · "+LifeLabel(life.Snapshot.State);
             foreach(KeyValuePair<PetInteraction,Button> item in interactionButtons) {
                 bool selected=interaction.Active&&interaction.Kind==item.Key;
-                item.Value.Background=Brush(selected?"#F9EDEA":"#FFFFFF");
-                item.Value.BorderBrush=Brush(selected?"#D7A9A3":"#E8E5DC");
+                SetSelectionStyle(item.Value,selected);
                 item.Value.IsEnabled=!StudyBusy||item.Key==PetInteraction.Petted;
             }
         }
@@ -622,6 +654,7 @@ namespace Tamago {
         void Quit() {
             if(quitting)return;quitting=true;Save();
             DisposeAgentChat();
+            if(panelTheme!=null)panelTheme.Dispose();
             if(timer!=null)timer.Stop();
             if(tray!=null){tray.Visible=false;var icon=tray.Icon;tray.Dispose();if(icon!=null)icon.Dispose();}
             Shutdown();
@@ -632,7 +665,7 @@ namespace Tamago {
             List<string> checks=new List<string>();
             try {
                 timer.Stop();
-                if(panelTitle.Text!=profile.CharacterName+"的小小世界"||Find<Button>("FindPet").Content.ToString()!="⌖  找回"+profile.CharacterName)
+                if(panelTitle.Text!=profile.CharacterName||Find<Button>("FindPet").Content.ToString()!="⌖  找回"+profile.CharacterName)
                     throw new Exception("角色名称没有应用到面板");
                 if(assets.Error!=null&&Find<TextBlock>("PackStatus").Text!=assets.Error)throw new Exception("回退原因没有显示");
                 foreach(var entry in actionButtons) {
@@ -681,7 +714,7 @@ namespace Tamago {
                 TestLifeUi(checks,output);
                 TestStudyUi(checks,output);
                 TestAgentPort(checks);
-                TestAgentChatUi(checks);
+                TestAgentChatUi(checks,output);
                 CaptureInteractionSheet(Path.Combine(output,"interaction-preview.png"));
                 CaptureInteractionAnimationSheet(Path.Combine(output,"interaction-animation-preview.png"));
                 TestGazeUi(checks);
@@ -694,12 +727,13 @@ namespace Tamago {
                 Capture(panel,Path.Combine(output,"panel-preview.png"));
                 Capture(pet,Path.Combine(output,"pet-preview.png"));
                 CaptureAtlas(Path.Combine(output,"sprite-contact-sheet.png"));
-                Find<Button>("HidePanel").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));if(panel.IsVisible)throw new Exception("收起失败");
+                Find<Button>("PanelClose").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));if(panel.IsVisible)throw new Exception("收起失败");
                 ShowPanel();if(!panel.IsVisible)throw new Exception("恢复面板失败");checks.Add("PASS hide and reopen panel");
                 StartLiveSpeechTest(checks,output);
             } catch(Exception e) { File.WriteAllText(Path.Combine(output,"smoke-test.txt"),string.Join(Environment.NewLine,checks.ToArray())+Environment.NewLine+"FAIL "+e);quitting=true;Shutdown(1); }
         }
         void TestLifeUi(List<string> checks,string output) {
+            SelectPanelPage("Preferences");
             interaction.Clear();gaze.Clear();petUntil=0;companionUntil=0;
             engine.SetAutomatic(true);engine.Energy=39;engine.SetAction(PetAction.WalkRight,false);
             life=new PetLifeState();life.Observe(0,engine.Energy,engine.Action);
@@ -741,6 +775,7 @@ namespace Tamago {
                 throw new Exception("拖拽期间生命状态改变动作或计时");
             engine.Dragging=false;
             life=new PetLifeState();engine.Energy=100;engine.SetAutomatic(true);
+            SelectPanelPage("Chat");
             engine.SetAction(PetAction.Idle,false);engine.ClearAutomaticHold();Refresh();
             checks.Add("PASS life state changes actions, preserves automatic sleep and manual drag control");
         }

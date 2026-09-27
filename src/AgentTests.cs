@@ -111,8 +111,8 @@ namespace Tamago {
             bubbleUntil=0;interaction.Clear();engine.SetAutomatic(true);engine.SetAction(PetAction.Idle,false);
             checks.Add("PASS Agent Ready V1 snapshot, dispatcher, commands and priority rules");
         }
-        void TestAgentChatUi(List<string> checks) {
-            if(agentInput==null||agentSend==null||agentCancel==null||agentStatus==null||agentReply==null||agentToolTrace==null)
+        void TestAgentChatUi(List<string> checks,string output) {
+            if(agentInput==null||agentSend==null||agentCancel==null||agentStatus==null||agentHistory==null||agentToolTrace==null)
                 throw new Exception("Agent 输入区未接入面板");
             bubbleUntil=0;petUntil=0;companionUntil=0;interaction.Clear();
             ChatTestModel model=new ChatTestModel();
@@ -124,8 +124,11 @@ namespace Tamago {
             AgentRunResult result=WaitForAgent(agentPending);
             if(result==null||result.Code!=AgentRunCode.Completed||result.ToolTrace.Count!=1||
                 result.ToolTrace[0].Code!=AgentToolCode.Applied||engine.Action!=PetAction.Sit||
-                !agentReply.Text.Contains("玉子已经坐好了。")||!agentReply.Text.Contains("你：请坐下")||agentInput.Text!=""||!agentSend.IsEnabled||agentCancel.IsEnabled)
+                !agentTranscript.Contains("玉子已经坐好了。")||!agentTranscript.Contains("你：请坐下")||agentInput.Text!=""||!agentSend.IsEnabled||agentCancel.IsEnabled)
                 throw new Exception("Agent 面板未显示真实的动作执行结果");
+            panelTheme.ApplyForTesting(false,false);panel.UpdateLayout();
+            Capture(panel,System.IO.Path.Combine(output,"agent-success-panel.png"));
+            panelTheme.ApplySystemTheme();
 
             bubbleUntil=clock.Elapsed.TotalSeconds+8;
             model=new ChatTestModel();
@@ -136,7 +139,7 @@ namespace Tamago {
             agentSend.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             result=WaitForAgent(agentPending);
             if(result==null||result.Code!=AgentRunCode.Busy||engine.Action!=PetAction.Sit||
-                !agentToolTrace.Text.Contains("Busy")||agentReply.Text.Contains("跑起来")||agentInput.Text!="请跑步")
+                !agentToolTrace.Text.Contains("Busy")||agentTranscript.Contains("跑起来")||agentInput.Text!="请跑步")
                 throw new Exception("Agent 面板把忙碌操作误报为成功");
             bubbleUntil=0;
 
@@ -161,17 +164,66 @@ namespace Tamago {
             result=WaitForAgent(agentPending);
             if(result==null||result.Code!=AgentRunCode.Cancelled||!agentSend.IsEnabled||agentCancel.IsEnabled||
                 agentInput.Text!="等待取消")throw new Exception("Agent 面板取消后未恢复输入");
-            string transcript=agentReply.Text;
+            string transcript=agentTranscript;
             panel.Hide();panel.Show();
-            if(agentReply.Text!=transcript||agentConversation.Turns.Count!=4||!agentReply.Text.Contains("请坐下")||
-                !agentReply.Text.Contains("等待取消"))throw new Exception("收起面板丢失了对话");
+            if(agentTranscript!=transcript||agentConversation.Turns.Count!=4||!agentTranscript.Contains("请坐下")||
+                !agentTranscript.Contains("等待取消"))throw new Exception("收起面板丢失了对话");
+            panelTheme.ApplyForTesting(true,false);panel.UpdateLayout();
+            Capture(panel,System.IO.Path.Combine(output,"agent-workspace-dark.png"));
+            if(!panelTheme.IsDark||panelTheme.IsHighContrast)throw new Exception("深色主题未应用");
+            Find<Button>("NavActions").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"agent-actions-dark.png"));
+            Find<Button>("NavPreferences").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"agent-preferences-dark.png"));
+            Find<Button>("NavChat").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            panelTheme.ApplyForTesting(false,false);panel.UpdateLayout();
+            Capture(panel,System.IO.Path.Combine(output,"agent-workspace-light.png"));
+            panelTheme.ApplyForTesting(false,true);
+            panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"agent-workspace-high-contrast.png"));
+            if(!panelTheme.IsHighContrast||
+                !Object.ReferenceEquals(panel.Resources["WindowBackgroundBrush"],SystemColors.WindowBrush)||
+                !Object.ReferenceEquals(Find<Button>("NavChat").Foreground,SystemColors.HighlightTextBrush))
+                throw new Exception("高对比度主题未应用");
+            panelTheme.ApplySystemTheme();
+            double originalWidth=panel.Width,originalHeight=panel.Height;
+            panel.Width=panel.MinWidth;panel.Height=panel.MinHeight;
+            panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"agent-workspace-compact.png"));
+            panel.Width=originalWidth;panel.Height=originalHeight;
+            Find<Button>("NavActions").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if(Find<Grid>("ActionsPage").Visibility!=Visibility.Visible||Find<Grid>("ChatPage").Visibility!=Visibility.Collapsed)
+                throw new Exception("动作页面未切换");
+            panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"agent-actions-panel.png"));
+            Find<Button>("NavPreferences").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if(Find<Grid>("PreferencesPage").Visibility!=Visibility.Visible)throw new Exception("偏好页面未切换");
+            panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"agent-preferences-panel.png"));
+            Find<Button>("NavChat").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if(Find<Grid>("ChatPage").Visibility!=Visibility.Visible)throw new Exception("聊天页面未恢复");
+            Find<Button>("PanelZoom").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if(panel.WindowState!=WindowState.Maximized)throw new Exception("绿色窗口按钮未最大化");
+            Find<Button>("PanelZoom").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if(panel.WindowState!=WindowState.Normal)throw new Exception("绿色窗口按钮未还原");
+            Find<Button>("PanelMinimize").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if(panel.WindowState!=WindowState.Minimized)throw new Exception("黄色窗口按钮未最小化");
+            panel.WindowState=WindowState.Normal;
             agentClear.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            if(agentConversation.Turns.Count!=0||agentReply.Text!=""||!agentClear.IsEnabled)
+            if(agentConversation.Turns.Count!=0||agentTranscript!=""||!agentClear.IsEnabled)
                 throw new Exception("清空未同时清除界面和会话");
+            foreach(AgentToolCode code in new [] {AgentToolCode.Busy,AgentToolCode.InvalidState,AgentToolCode.ExecutionUnknown}) {
+                AgentRequest request;
+                if(!agentConversation.TryBegin("失败状态检查",out request))throw new Exception("无法开始界面状态检查");
+                agentConversation.Complete(request,new AgentRunResult(AgentRunCode.ToolFailure,
+                    "操作未确认，请核对状态。",null,new [] {new AgentToolFeedback("ui-"+code,"set_action",code,null)},1));
+            }
+            RenderAgentConversation();
+            if(!agentTranscript.Contains("Busy · 忙碌，未执行")||
+                !agentTranscript.Contains("InvalidState · 状态不允许，未执行")||
+                !agentTranscript.Contains("ExecutionUnknown · 结果未知，请核对状态"))
+                throw new Exception("失败工具状态在时间线中被误报");
+            agentClear.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             agentRuntime=null;
-            agentInput.Clear();agentReply.Text="";agentToolTrace.Text="";
+            agentInput.Clear();agentToolTrace.Text="";
             agentStatus.Text="发送会调用 Qwen；不会自动监听桌面";
-            checks.Add("PASS Agent input submits, reports tool outcomes, blocks duplicates and cancels");
+            checks.Add("PASS Agent workspace chat, navigation, theme, window controls and outcomes");
         }
     }
 }

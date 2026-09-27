@@ -5,13 +5,17 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Tamago {
     public sealed partial class PetApp {
         TextBox agentInput;
         Button agentSend,agentCancel,agentClear;
         readonly AgentConversationSession agentConversation=new AgentConversationSession();
-        TextBlock agentStatus,agentReply,agentToolTrace;
+        TextBlock agentStatus,agentToolTrace;
+        StackPanel agentHistory;
+        ScrollViewer agentHistoryScroll;
+        string agentTranscript="";
         AgentRuntime agentRuntime;
         QwenModelAdapter agentAdapter;
         CancellationTokenSource agentCancellation;
@@ -25,7 +29,8 @@ namespace Tamago {
             agentClear=Find<Button>("AgentClear");
             agentClear.Click+=delegate { ClearAgentConversation(); };
             agentStatus=Find<TextBlock>("AgentStatus");
-            agentReply=Find<TextBlock>("AgentReply");
+            agentHistory=Find<StackPanel>("AgentHistory");
+            agentHistoryScroll=Find<ScrollViewer>("AgentHistoryScroll");
             agentToolTrace=Find<TextBlock>("AgentToolTrace");
             agentSend.Click+=delegate { agentPending=SubmitAgentRequestAsync(); };
             agentCancel.Click+=delegate {
@@ -49,16 +54,67 @@ namespace Tamago {
             agentToolTrace.Text="";
             agentStatus.Text="对话已清空，下一条消息将开始新会话。";
         }
-        void RenderAgentConversation() {
-            List<string> entries=new List<string>();
-            foreach(AgentConversationTurn turn in agentConversation.Turns) {
-                List<string> tools=new List<string>();
-                foreach(AgentConversationTool tool in turn.Tools)tools.Add(tool.Name+" · "+tool.Code);
-                entries.Add("你："+turn.Input+"\n玉子："+turn.Reply+"\n状态："+turn.Status+
-                    "\n实际动作："+(tools.Count==0?"无":String.Join("；",tools.ToArray())));
+        static TextBlock TimelineLine(string value,string color,double fontSize) {
+            TextBlock line=new TextBlock {Text=value,FontSize=fontSize,TextWrapping=TextWrapping.Wrap,
+                FontFamily=new FontFamily("Consolas"),Margin=new Thickness(0,0,0,8)};
+            line.SetResourceReference(TextBlock.ForegroundProperty,color);
+            return line;
+        }
+        static string ToolOutcome(AgentToolCode code) {
+            switch(code) {
+                case AgentToolCode.Applied:return "已执行";
+                case AgentToolCode.Busy:return "忙碌，未执行";
+                case AgentToolCode.InvalidState:return "状态不允许，未执行";
+                case AgentToolCode.StorageUnavailable:return "存储不可用，未执行";
+                case AgentToolCode.ExecutionUnknown:return "结果未知，请核对状态";
+                case AgentToolCode.ShuttingDown:return "正在退出，未执行";
+                default:return "调用无效，未执行";
             }
-            agentReply.Text=String.Join("\n\n────────\n\n",entries.ToArray());
-            Find<ScrollViewer>("AgentHistoryScroll").ScrollToEnd();
+        }
+        static string ToolColor(AgentToolCode code) {
+            if(code==AgentToolCode.Applied)return "SuccessBrush";
+            if(code==AgentToolCode.ExecutionUnknown)return "WarningBrush";
+            return "DangerBrush";
+        }
+        void RenderAgentConversation() {
+            agentHistory.Children.Clear();
+            List<string> transcript=new List<string>();
+            if(agentConversation.Turns.Count==0) {
+                agentHistory.Children.Add(TimelineLine("> 等待输入请求…\n\n请求完成后，这里会按顺序显示工具执行结果与最终回复。",
+                    "TextSecondaryBrush",13));
+            }
+            int index=0;
+            foreach(AgentConversationTurn turn in agentConversation.Turns) {
+                index++;
+                Border card=new Border {CornerRadius=new CornerRadius(10),BorderThickness=new Thickness(1),
+                    Padding=new Thickness(14,12,14,8),Margin=new Thickness(0,0,0,10)};
+                card.SetResourceReference(Border.BackgroundProperty,"SurfaceAltBrush");
+                card.SetResourceReference(Border.BorderBrushProperty,"BorderBrush");
+                StackPanel lines=new StackPanel();card.Child=lines;
+                lines.Children.Add(TimelineLine("SESSION  "+index.ToString("00")+"   ·   "+turn.Status,
+                    turn.Status==AgentRunCode.Completed?"AccentBrush":"WarningBrush",10));
+                lines.Children.Add(TimelineLine("> 你\n"+turn.Input,"TextPrimaryBrush",12));
+                transcript.Add("你："+turn.Input);
+                if(turn.Tools.Count==0) {
+                    lines.Children.Add(TimelineLine("  └─ TOOL  无调用","TextSecondaryBrush",11));
+                    transcript.Add("实际动作：无");
+                } else {
+                    int toolIndex=0;
+                    foreach(AgentConversationTool tool in turn.Tools) {
+                        toolIndex++;
+                        string outcome=ToolOutcome(tool.Code);
+                        lines.Children.Add(TimelineLine("  ├─ TOOL "+toolIndex+"  "+tool.Name+"  ["+tool.Code+"]  "+outcome,
+                            ToolColor(tool.Code),11));
+                        transcript.Add("实际动作："+tool.Name+" · "+tool.Code+" · "+outcome);
+                    }
+                }
+                lines.Children.Add(TimelineLine("< 玉子\n"+turn.Reply,"TextPrimaryBrush",12));
+                transcript.Add("玉子："+turn.Reply);
+                transcript.Add("状态："+turn.Status);
+                agentHistory.Children.Add(card);
+            }
+            agentTranscript=String.Join("\n",transcript.ToArray());
+            agentHistoryScroll.ScrollToEnd();
         }
         static string AgentStatusFor(AgentRunResult result) {
             switch(result.Code) {
