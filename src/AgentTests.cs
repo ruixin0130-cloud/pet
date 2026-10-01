@@ -111,6 +111,33 @@ namespace Tamago {
             bubbleUntil=0;interaction.Clear();engine.SetAutomatic(true);engine.SetAction(PetAction.Idle,false);
             checks.Add("PASS Agent Ready V1 snapshot, dispatcher, commands and priority rules");
         }
+        void TestDurableTaskUi(List<string> checks,string output) {
+            Find<Button>("NavChat").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Expander section=Find<Expander>("DurablePanel");section.IsExpanded=true;
+            WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
+            durableFile.Text="ui-approved.txt";durableText.Text="UI durable permission test";
+            durableCreate.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
+            if(durableSelection==null||durableSelection.Status!=AgentTaskStatus.WaitingForApproval||!durableApprove.IsEnabled||
+                !durableReject.IsEnabled||System.IO.File.Exists(System.IO.Path.Combine(durableHost.FileDirectory,"ui-approved.txt")))
+                throw new Exception("Durable UI did not suspend the file operation for permission");
+            agentHistoryScroll.ScrollToTop();panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"durable-permission-waiting.png"));
+            durableApprove.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
+            if(durableSelection.Status!=AgentTaskStatus.Succeeded||durableApprove.IsEnabled||
+                System.IO.File.ReadAllText(System.IO.Path.Combine(durableHost.FileDirectory,"ui-approved.txt"))!="UI durable permission test")
+                throw new Exception("Durable UI approval did not persist the actual file result");
+            panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"durable-permission-succeeded.png"));
+            durableFile.Text="ui-rejected.txt";
+            durableCreate.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
+            durableReject.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
+            if(durableSelection.Status!=AgentTaskStatus.Failed||System.IO.File.Exists(System.IO.Path.Combine(durableHost.FileDirectory,"ui-rejected.txt")))
+                throw new Exception("Durable UI rejection caused a file effect");
+            checks.Add("PASS Durable Task V2 UI displays bound permission, approves/persists a real file, rejects without executing (isolated Fake host)");
+            section.IsExpanded=false;
+        }
         void TestAgentChatUi(List<string> checks,string output) {
             if(agentInput==null||agentSend==null||agentCancel==null||agentStatus==null||agentHistory==null||agentToolTrace==null)
                 throw new Exception("Agent 输入区未接入面板");

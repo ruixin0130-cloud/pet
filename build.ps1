@@ -1,3 +1,4 @@
+param([switch]$SkipDistribution)
 $ErrorActionPreference = 'Stop'
 $petProject = $PSScriptRoot
 $petBin = Join-Path $petProject 'bin'
@@ -30,6 +31,17 @@ $petArgs = @(
     '/reference:System.Net.Http.dll',
     '/reference:System.Xml.Linq.dll',
     '/reference:System.Web.Extensions.dll',
+    "$petProject\src\Core\AgentCoreContracts.cs",
+    "$petProject\src\Core\AgentCoreRuntime.cs",
+    "$petProject\src\Core\AgentTools.cs",
+    "$petProject\src\Core\AgentTasks.cs",
+    "$petProject\src\Core\AgentExtensions.cs",
+    "$petProject\src\Core\AgentDurableContracts.cs",
+    "$petProject\src\Core\AgentDurableService.cs",
+    "$petProject\src\Core\AgentFileWriteTool.cs",
+    "$petProject\src\Persistence\JsonAgentTaskStore.cs",
+    "$petProject\src\Persistence\LocalAgentFileWriter.cs",
+    "$petProject\src\AgentPetCoreBridge.cs",
     "$petProject\src\PetEngine.cs",
     "$petProject\src\PetLifeState.cs",
     "$petProject\src\StudySession.cs",
@@ -45,6 +57,8 @@ $petArgs = @(
     "$petProject\src\AgentRuntime.cs",
     "$petProject\src\AgentRuntimeTests.cs",
     "$petProject\src\AgentChatApp.cs",
+    "$petProject\src\AgentDurableHost.cs",
+    "$petProject\src\AgentDurableApp.cs",
     "$petProject\src\PanelTheme.cs",
     "$petProject\src\QwenModelAdapter.cs",
     "$petProject\src\QwenModelAdapterTests.cs",
@@ -58,7 +72,9 @@ $petArgs = @(
 )
 & $petCompiler @petArgs
 if ($LASTEXITCODE -ne 0) { throw "Build failed (exit $LASTEXITCODE)." }
-Copy-Item -LiteralPath $petOutput -Destination (Join-Path $petProject ([string][char]0x7389+[char]0x5B50+[char]0x684C+[char]0x5BA0+'.exe')) -Force
+if (-not $SkipDistribution) {
+    Copy-Item -LiteralPath $petOutput -Destination (Join-Path $petProject ([string][char]0x7389+[char]0x5B50+[char]0x684C+[char]0x5BA0+'.exe')) -Force
+}
 $petContentSource=Join-Path $petProject 'content\tamago-profile.json'
 $petBinContent=Join-Path $petBin 'content'
 New-Item -ItemType Directory -Force -Path $petBinContent | Out-Null

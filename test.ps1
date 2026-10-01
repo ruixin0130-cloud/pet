@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
-& (Join-Path $PSScriptRoot 'build.ps1')
+& (Join-Path $PSScriptRoot 'test-core.ps1')
+& (Join-Path $PSScriptRoot 'build.ps1') -SkipDistribution
 $petExe = Join-Path $PSScriptRoot 'bin/Tamago.exe'
 $petTest = Start-Process -FilePath $petExe -ArgumentList '--self-test' -WindowStyle Hidden -PassThru
 if (-not $petTest.WaitForExit(30000)) { Stop-Process -Id $petTest.Id; throw 'Engine tests timed out.' }

@@ -23,6 +23,7 @@ namespace Tamago {
         bool agentRunning;
 
         void InitializeAgentChat() {
+            InitializeDurablePanel();
             agentInput=Find<TextBox>("AgentInput");
             agentSend=Find<Button>("AgentSend");
             agentCancel=Find<Button>("AgentCancel");
@@ -204,6 +205,7 @@ namespace Tamago {
             }
         }
         void DisposeAgentChat() {
+            if(durableHost!=null&&!durableBusy){durableHost.Dispose();durableHost=null;}
             if(agentCancellation!=null)agentCancellation.Cancel();
             if(agentAdapter!=null) {agentAdapter.Dispose();agentAdapter=null;}
         }

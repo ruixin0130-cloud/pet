@@ -76,13 +76,12 @@ namespace Tamago {
                 default:return AgentToolCode.ExecutionUnknown;
             }
         }
-        public async Task<AgentToolCode> ExecuteAsync(AgentToolCall call,IAgentPetPort port,IEnumerable<string> allowedTools) {
+        public AgentToolCode ValidateCall(AgentToolCall call,IEnumerable<string> allowedTools=null) {
             if(call==null||!Known(call.Name))return AgentToolCode.UnknownTool;
             if(!Allowed(call.Name,allowedTools))return AgentToolCode.NotAllowed;
             Dictionary<string,object> args=Arguments(call.ArgumentsJson,call.Name=="end_study"?0:1);
             if(args==null)return AgentToolCode.MalformedArguments;
             object raw;string value;
-            AgentCommandResult result;
             switch(call.Name) {
                 case "set_action":
                     PetAction action;
@@ -90,7 +89,7 @@ namespace Tamago {
                         !Enum.IsDefined(typeof(PetAction),action)||
                         !String.Equals(Enum.GetName(typeof(PetAction),action),value,StringComparison.Ordinal))
                         return AgentToolCode.MalformedArguments;
-                    result=await port.SetActionAsync(action);break;
+                    break;
                 case "play_interaction":
                     PetInteraction interaction;
                     if(!OneString(args,"interaction",out value)||!Enum.TryParse<PetInteraction>(value,false,out interaction)||
@@ -98,17 +97,33 @@ namespace Tamago {
                         !Enum.IsDefined(typeof(PetInteraction),interaction)||
                         !String.Equals(Enum.GetName(typeof(PetInteraction),interaction),value,StringComparison.Ordinal))
                         return AgentToolCode.MalformedArguments;
-                    result=await port.PlayInteractionAsync(interaction);break;
+                    break;
                 case "speak":
                     if(!OneString(args,"text",out value)||!ValidSpeech(value))return AgentToolCode.MalformedArguments;
-                    result=await port.SpeakAsync(value);break;
+                    break;
                 case "set_automatic":
                     if(!args.TryGetValue("enabled",out raw)||!(raw is bool))return AgentToolCode.MalformedArguments;
-                    result=await port.SetAutomaticAsync((bool)raw);break;
+                    break;
                 case "start_study":
                     if(!args.TryGetValue("minutes",out raw)||!(raw is int)||
                         ((int)raw!=25&&(int)raw!=45&&(int)raw!=60))return AgentToolCode.MalformedArguments;
-                    result=await port.StartStudyAsync((int)raw);break;
+                    break;
+                case "end_study":break;
+                default:return AgentToolCode.UnknownTool;
+            }
+            return AgentToolCode.Applied;
+        }
+        public async Task<AgentToolCode> ExecuteAsync(AgentToolCall call,IAgentPetPort port,IEnumerable<string> allowedTools) {
+            AgentToolCode validation=ValidateCall(call,allowedTools);
+            if(validation!=AgentToolCode.Applied)return validation;
+            Dictionary<string,object> args=Arguments(call.ArgumentsJson,call.Name=="end_study"?0:1);
+            AgentCommandResult result;
+            switch(call.Name) {
+                case "set_action":result=await port.SetActionAsync((PetAction)Enum.Parse(typeof(PetAction),(string)args["action"]));break;
+                case "play_interaction":result=await port.PlayInteractionAsync((PetInteraction)Enum.Parse(typeof(PetInteraction),(string)args["interaction"]));break;
+                case "speak":result=await port.SpeakAsync((string)args["text"]);break;
+                case "set_automatic":result=await port.SetAutomaticAsync((bool)args["enabled"]);break;
+                case "start_study":result=await port.StartStudyAsync((int)args["minutes"]);break;
                 case "end_study":result=await port.EndStudyAsync();break;
                 default:return AgentToolCode.UnknownTool;
             }

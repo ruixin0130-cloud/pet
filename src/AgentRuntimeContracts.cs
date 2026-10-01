@@ -5,36 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace Tamago {
-    public enum ModelDecisionKind { Final, ToolCall }
-    public enum AgentRunCode { Completed, Busy, Cancelled, InvalidRequest, SnapshotUnavailable, ModelUnavailable, ModelTimeout, ProtocolError, ToolFailure, LimitReached }
-    public enum AgentToolCode { Applied, Busy, InvalidArgument, InvalidState, StorageUnavailable, ShuttingDown, UnknownTool, NotAllowed, MalformedArguments, ExecutionUnknown }
-
-    public sealed class AgentToolDefinition {
-        public string Name { get; private set; }
-        public string Description { get; private set; }
-        public string ParametersJson { get; private set; }
-        internal AgentToolDefinition(string name,string description,string parametersJson) {
-            Name=name;Description=description;ParametersJson=parametersJson;
-        }
-    }
-    public sealed class AgentToolCall {
-        public string CallId { get; private set; }
-        public string Name { get; private set; }
-        public string ArgumentsJson { get; private set; }
-        public AgentToolCall(string callId,string name,string argumentsJson) {
-            CallId=callId;Name=name;ArgumentsJson=argumentsJson;
-        }
-    }
-    public sealed class ModelDecision {
-        public ModelDecisionKind Kind { get; private set; }
-        public string FinalText { get; private set; }
-        public AgentToolCall ToolCall { get; private set; }
-        ModelDecision(ModelDecisionKind kind,string finalText,AgentToolCall toolCall) {
-            Kind=kind;FinalText=finalText;ToolCall=toolCall;
-        }
-        public static ModelDecision Final(string text) { return new ModelDecision(ModelDecisionKind.Final,text,null); }
-        public static ModelDecision Call(AgentToolCall call) { return new ModelDecision(ModelDecisionKind.ToolCall,null,call); }
-    }
     public sealed class AgentToolFeedback {
         public string CallId { get; private set; }
         public string Name { get; private set; }

@@ -17,6 +17,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Test Core without WPF or pet assemblies
+        shell: powershell
+        run: .\test-core.ps1
       - name: Build WPF application
         shell: powershell
         run: |

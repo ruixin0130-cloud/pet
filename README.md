@@ -1,5 +1,23 @@
 # 玉子 · 桌面宠物 v0.12.0
 
+## Durable Task + Permission V2
+
+V2 在现有 Core 循环上增加本地持久任务、执行审计、人工审批和保守的崩溃恢复。打开对话工作台中的“持久任务 · 文件写入（Fake Provider）”，输入文件名与文本，点击请求写入；任务会先停在 `WaitingForApproval`，批准后才创建文件，拒绝不会调用写入工具。V2 使用独立 Fake Provider，不需要 API Key；既有按需 Qwen 聊天入口沿用原行为。
+
+任务、审批与执行记录保存在 `%LOCALAPPDATA%\TamagoPet\agent-v2\tasks\tasks.v2.json`；文件写入限制在同级 `agent-files` 目录，仅创建新 `.txt` 文件，不覆盖既有文件。审批绑定 Task / Run / Call / Tool、规范化参数哈希、风险等级、工具契约和目标目录；参数或目录变化后必须重新批准。
+
+刷新任务可恢复等待审批的记录，包括已经批准但尚未分发的操作。未确认结果的执行进入 `NeedsReview`，没有执行分发记录的中断任务进入 `Interrupted`；请先确认旧执行停止并核对实际效果，再提交人工结论，系统不会自动重放。存储损坏或提交失败时拒绝继续执行，并保留原记录。任务与 UI 状态机解耦，可通过独立 Core 控制台测试完成全流程。
+
+V2 的异步持久化边界、状态模型、恢复限制、验收证据与接口见 [Durable Task + Permission V2](docs/durable-task-v2.md)。运行 `test-core.ps1` 验证无 WPF 的核心流程，运行 `test.ps1` 验证完整 Windows 回归；测试使用隔离目录。若分发 EXE 正在运行，可使用 `build.ps1 -SkipDistribution` 构建 `bin/Tamago.exe`；完整测试默认采用此方式，不覆盖正在运行的分发文件。
+
+## Core Foundation V1
+
+Windows Agent 已抽出不依赖 WPF、桌宠和模型厂商的 `src/Core/`。`AgentCoreRuntime` 接受通用输入、不可变 JSON 上下文、`IAgentCoreModelAdapter`、工具注册表、权限策略和任务存储；没有桌宠状态源也可以进行纯对话。现有 `AgentRuntime` 是兼容入口，通过 `AgentPetCoreBridge` 使用原来的六种工具、`IAgentPetPort` 和 Qwen Adapter。桌宠动作、学习陪伴、每日统计、会话容量和用户数据格式沿用原实现。
+
+权限默认拒绝，宿主明确授予 scope，请求允许名单只能缩小权限。桌宠入口只授予 `pet` scope。工具执行前同时检查名称、参数、权限和任务状态；需要确认的调用返回 `AwaitingApproval` / `WaitingForApproval`，带上任务、运行和具体调用信息，尚未执行。本阶段没有审批界面或审批后自动恢复。任务状态使用容量为 128 的内存存储，不提供跨重启恢复；不保存输入全文或普通工具参数。`Memory`、`Scheduler`、Provider 选择只定义接口，没有新增服务、网络调用或自动任务。
+
+单独验证 Core：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-core.ps1`。它只编译 Core DLL 和控制台测试，不引用 WPF、桌宠代码、资源或 Qwen，结果在 `output/core-tests.txt`。完整 Windows 回归仍运行 `test.ps1`，已包含 Core 测试。当前编译器仍是 .NET Framework；Mac Swift 实现未迁移到这套 Core。接口、迁移方式和限制见 [Core Foundation V1 架构](docs/core-foundation-v1.md)。
+
 ## Windows 面板：Agent 工作台
 
 Windows 面板默认打开“对话工作台”，左侧可切换“动作与互动”和“陪伴偏好”。聊天记录按请求、真实工具结果、最终回复的顺序显示；处理中的请求可取消，已经执行的动作不会撤销。最近 6 轮只保留在本次运行中，清空按钮同时清除界面和后续请求的上下文。学习计时仍从桌宠右键菜单进入。
@@ -63,7 +81,7 @@ $run.ExitCode
 
 每次只处理一个请求；每次请求最多 4 轮模型决策、3 次串行工具调用。模型决策的总时间预算默认 30 秒，状态读取和一次 Port 调用默认分别限时 5 秒。`Busy`、学习存储失败等结果会反馈给模型，但不再执行新的工具；最终回复会用确定的失败文案，避免模型误报成功。非法工具调用可在剩余调用额度内纠正一次。已经提交的 Port 指令不会因请求取消而重试；若超过 Port 等待时间，结果标为 `ExecutionUnknown`，提示用户核对实际状态。
 
-实现位于 `src/AgentRuntimeContracts.cs`、`src/AgentToolRouter.cs` 和 `src/AgentRuntime.cs`。`src/AgentRuntimeTests.cs` 用假模型和假 Port 覆盖成功闭环、上限、忙碌、非法调用、存储失败、超时、取消及并发请求；`test.ps1` 仍运行原有 WPF 和角色包回归。Runtime 不绑定具体模型或聊天 UI，也不保存对话历史。
+通用循环位于 `src/Core/AgentCoreRuntime.cs`；`src/AgentRuntime.cs` 保留兼容入口，`src/AgentPetCoreBridge.cs` 转换桌宠快照和现有模型契约，`src/AgentToolRouter.cs` 保留桌宠参数校验及分发。`src/AgentRuntimeTests.cs` 用假模型和假 Port 覆盖成功闭环、上限、忙碌、非法调用、存储失败、超时、取消及并发请求；`test.ps1` 仍运行原有 WPF 和角色包回归。Runtime 不绑定具体模型或聊天 UI，也不自行保存对话历史。
 
 ## Agent Ready V1
 
