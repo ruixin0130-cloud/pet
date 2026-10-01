@@ -224,6 +224,7 @@ namespace Tamago {
                 StudyTests.Run(Check);
                 AgentRuntimeTests.Run(Check);
                 AgentConversationTests.Run(Check);
+                AgentWorkspaceViewModelTests.Run(Check);
                 QwenModelAdapterTests.Run(Check);
                 TestProfile();
                 TestDialogue();

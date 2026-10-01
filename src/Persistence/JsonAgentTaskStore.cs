@@ -10,10 +10,12 @@ using System.Web.Script.Serialization;
 
 namespace Tamago {
     // The only adapter that accesses durable task files. A lifetime lease excludes a second host.
-    public sealed class JsonAgentTaskStore : IAgentDurableTaskStore {
+    public sealed partial class JsonAgentTaskStore : IAgentDurableTaskStore,IMemoryStore,IConversationStore {
         public sealed class Document {
             public int Version { get; set; }
             public List<AgentDurableTask> Tasks { get; set; }
+            public List<MemoryRecord> Memories {get;set;}
+            public List<ConversationRecord> Conversations {get;set;}
         }
         readonly string path;
         readonly FileStream lease;
@@ -21,10 +23,13 @@ namespace Tamago {
         Document document;
         bool disposed;
         bool writeFaulted;
+        readonly Func<DateTimeOffset> utcNow;
+        public string StorageIdentity {get {return Path.GetFullPath(path).ToUpperInvariant();} }
         [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
         static extern bool MoveFileEx(string source,string destination,int flags);
         static JavaScriptSerializer Serializer() {return new JavaScriptSerializer {MaxJsonLength=8*1024*1024,RecursionLimit=32};}
-        public JsonAgentTaskStore(string directory) {
+        public JsonAgentTaskStore(string directory,Func<DateTimeOffset> clock=null) {
+            utcNow=clock??delegate {return DateTimeOffset.UtcNow;};
             directory=Path.GetFullPath(directory);Directory.CreateDirectory(directory);
             path=Path.Combine(directory,"tasks.v2.json");
             lease=new FileStream(Path.Combine(directory,"writer.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);
@@ -32,12 +37,22 @@ namespace Tamago {
                 if(File.Exists(path)) {
                     if(new FileInfo(path).Length>8*1024*1024)throw new InvalidDataException("Task store exceeds the supported size.");
                     document=Serializer().Deserialize<Document>(File.ReadAllText(path,Encoding.UTF8));Validate(document);
-                } else document=new Document {Version=2,Tasks=new List<AgentDurableTask>()};
+                    if(document.Version==2) {
+                        // Add empty, separate collections; never infer memories from old tasks.
+                        Document migrated=new Document {Version=3,Tasks=document.Tasks,Memories=new List<MemoryRecord>(),Conversations=new List<ConversationRecord>()};
+                        SaveDocumentAsync(migrated).GetAwaiter().GetResult();
+                    }
+                    Document retained=NextDocument();
+                    if(PruneConversations(retained))SaveDocumentAsync(retained).GetAwaiter().GetResult();
+                } else document=new Document {Version=3,Tasks=new List<AgentDurableTask>(),Memories=new List<MemoryRecord>(),Conversations=new List<ConversationRecord>()};
                 // Uncommitted temporary files are never promoted on recovery.
             } catch {lease.Dispose();throw;}
         }
         static void Validate(Document value) {
-            if(value==null||value.Version!=2||value.Tasks==null||value.Tasks.Count>256)throw new InvalidDataException("Unsupported or invalid task store.");
+            if(value==null||(value.Version!=2&&value.Version!=3)||value.Tasks==null||value.Tasks.Count>256)throw new InvalidDataException("Unsupported or invalid task store.");
+            if(value.Version==2) {
+                if(value.Memories!=null||value.Conversations!=null)throw new InvalidDataException("Invalid version 2 collections.");
+            } else ValidateMemoryCollections(value);
             HashSet<string> ids=new HashSet<string>(StringComparer.Ordinal);
             foreach(AgentDurableTask task in value.Tasks) {
                 Guid id;
@@ -95,7 +110,6 @@ namespace Tamago {
             finally {gate.Release();}
         }
         public async Task SaveAsync(AgentDurableTask task) {
-            bool writing=false;
             await gate.WaitAsync().ConfigureAwait(false);
             try {
                 CheckOpen();AgentDurableTask proposed=Copy(task);
@@ -105,24 +119,32 @@ namespace Tamago {
                         throw new InvalidOperationException("New task must start at Created; store capacity is 256.");
                 } else if(proposed.Revision!=previous.Revision+1||proposed.RunId!=previous.RunId||!Transition(previous.Status,proposed.Status))
                     throw new InvalidOperationException("Stale revision or invalid task transition.");
-                Document next=new Document {Version=2,Tasks=new List<AgentDurableTask>(document.Tasks)};
-                if(previous!=null)next.Tasks.Remove(previous);next.Tasks.Add(proposed);Validate(next);
-                string json=Serializer().Serialize(next);
-                writing=true;
+                Document next=NextDocument();
+                if(previous!=null)next.Tasks.Remove(previous);next.Tasks.Add(proposed);
+                await SaveDocumentAsync(next).ConfigureAwait(false);
+            }
+            finally {gate.Release();}
+        }
+        Document NextDocument() {
+            return new Document {Version=3,Tasks=new List<AgentDurableTask>(document.Tasks),
+                Memories=new List<MemoryRecord>(document.Memories),Conversations=new List<ConversationRecord>(document.Conversations)};
+        }
+        async Task SaveDocumentAsync(Document next) {
+            Validate(next);byte[] bytes=new UTF8Encoding(false).GetBytes(Serializer().Serialize(next));
+            if(bytes.Length>8*1024*1024)throw new InvalidDataException("Task store exceeds the supported size.");
+            try {
                 await Task.Run(delegate {
                     string temporary=path+".tmp";
-                    byte[] bytes=new UTF8Encoding(false).GetBytes(json);
-                    if(bytes.Length>8*1024*1024)throw new InvalidDataException("Task store exceeds the supported size.");
                     using(FileStream file=new FileStream(temporary,FileMode.Create,FileAccess.Write,FileShare.None)) {
                         file.Write(bytes,0,bytes.Length);file.Flush(true);
                     }
-                    // Same-directory rename on Windows/NTFS. Avoid ReplaceFile's ACL merge;
-                    // WRITE_THROUGH plus Flush(true) commits the checkpoint before returning.
-                    if(!MoveFileEx(temporary,path,0x1|0x8))throw new Win32Exception(Marshal.GetLastWin32Error(),"Atomic task checkpoint rename failed.");
+                    // Shared transaction for Tasks, Memories and Conversations; no retained content backup.
+                    if(!MoveFileEx(temporary,path,0x1|0x8)) {
+                        int error=Marshal.GetLastWin32Error();throw new Win32Exception(error,"Atomic checkpoint rename failed (Win32 "+error+").");
+                    }
                 }).ConfigureAwait(false);
                 document=next;
-            } catch {if(writing)writeFaulted=true;throw;}
-            finally {gate.Release();}
+            } catch {writeFaulted=true;throw;}
         }
         void CheckOpen() {
             if(disposed)throw new ObjectDisposedException("JsonAgentTaskStore");

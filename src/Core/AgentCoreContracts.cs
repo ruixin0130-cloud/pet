@@ -106,10 +106,12 @@ namespace Tamago {
         public ReadOnlyCollection<AgentCoreToolFeedback> Feedback { get; private set; }
         public int TurnNumber { get; private set; }
         public bool FinalOnly { get; private set; }
+        public AgentMemoryContext MemoryData {get;private set;}
         internal AgentCoreModelTurn(AgentCoreRequest request,AgentContextSnapshot snapshot,ReadOnlyCollection<AgentToolDefinition> tools,
-            IList<AgentCoreToolFeedback> feedback,int turnNumber,bool finalOnly) {
+            IList<AgentCoreToolFeedback> feedback,int turnNumber,bool finalOnly,AgentMemoryContext memoryData=null) {
             Input=request.Input;Context=request.Context;Snapshot=snapshot;Tools=tools;
             Feedback=new List<AgentCoreToolFeedback>(feedback).AsReadOnly();TurnNumber=turnNumber;FinalOnly=finalOnly;
+            MemoryData=memoryData??AgentMemoryContext.Empty;
         }
     }
     public sealed class AgentCoreResult {

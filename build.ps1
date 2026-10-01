@@ -1,7 +1,7 @@
-param([switch]$SkipDistribution)
+param([switch]$SkipDistribution,[string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
 $petProject = $PSScriptRoot
-$petBin = Join-Path $petProject 'bin'
+$petBin = if($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $petProject 'bin' }
 New-Item -ItemType Directory -Force -Path $petBin | Out-Null
 $petFramework = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319'
 if (-not (Test-Path (Join-Path $petFramework 'csc.exe'))) {
@@ -39,7 +39,11 @@ $petArgs = @(
     "$petProject\src\Core\AgentDurableContracts.cs",
     "$petProject\src\Core\AgentDurableService.cs",
     "$petProject\src\Core\AgentFileWriteTool.cs",
+    "$petProject\src\Core\AgentMemoryContracts.cs",
+    "$petProject\src\Core\AgentMemoryTools.cs",
+    "$petProject\src\Core\AgentMemoryService.cs",
     "$petProject\src\Persistence\JsonAgentTaskStore.cs",
+    "$petProject\src\Persistence\JsonAgentMemoryStore.cs",
     "$petProject\src\Persistence\LocalAgentFileWriter.cs",
     "$petProject\src\AgentPetCoreBridge.cs",
     "$petProject\src\PetEngine.cs",
@@ -57,8 +61,15 @@ $petArgs = @(
     "$petProject\src\AgentRuntime.cs",
     "$petProject\src\AgentRuntimeTests.cs",
     "$petProject\src\AgentChatApp.cs",
+    "$petProject\src\AgentWorkspaceViewModel.cs",
+    "$petProject\src\AgentWorkspaceViewModelTests.cs",
+    "$petProject\src\AgentMessageCard.cs",
+    "$petProject\src\AgentWorkspaceApp.cs",
+    "$petProject\src\AgentWorkspaceTests.cs",
+    "$petProject\src\UiQualityTests.cs",
     "$petProject\src\AgentDurableHost.cs",
     "$petProject\src\AgentDurableApp.cs",
+    "$petProject\src\AgentMemoryApp.cs",
     "$petProject\src\PanelTheme.cs",
     "$petProject\src\QwenModelAdapter.cs",
     "$petProject\src\QwenModelAdapterTests.cs",

@@ -1,5 +1,7 @@
 # V2 — Durable Task + Permission V1
 
+本文记录 V2 阶段基线；V3 复用此事务文件并将 schema 升为 3，迁移和 Memory 边界见 [Memory V1](memory-v1.md)。
+
 ## 仓库审计与实现边界
 
 2026-10-01 接手时，实际 Git 仓库为 `pet/`，分支 `codex/windows-macos-ui-v1`，最近提交为 `30e9d86`。工作区已有未提交的 Core Foundation V1，包括 Core、桥接、构建脚本、测试与文档；本次在这些文件上增量实现，没有重新实现 V1，也没有 commit / push。修改前的文件快照保存在被忽略的 `output/v2-baseline/`，可区分本次变更与原有未提交修改。

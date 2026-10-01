@@ -66,24 +66,28 @@ namespace Tamago {
                 Put(r,"SuccessBrush",SystemColors.WindowTextBrush);
                 Put(r,"WarningBrush",SystemColors.WindowTextBrush);
                 Put(r,"DangerBrush",SystemColors.WindowTextBrush);
+                Put(r,"DisabledTextBrush",SystemColors.GrayTextBrush);
+                Put(r,"ButtonOverlayBrush",SystemColors.WindowTextBrush);
                 return;
             }
-            Put(r,"WindowBackgroundBrush",Solid(dark?"#1C1C1E":"#F5F5F7"));
-            Put(r,"SidebarBackgroundBrush",Solid(dark?"#242427":"#EEEEF2"));
+            Put(r,"WindowBackgroundBrush",Solid(dark?"#202322":"#FAFBFA"));
+            Put(r,"SidebarBackgroundBrush",Solid(dark?"#191C1B":"#F0F2F0"));
             Put(r,"SurfaceBrush",Solid(dark?"#2C2C30":"#FFFFFF"));
-            Put(r,"SurfaceAltBrush",Solid(dark?"#37373B":"#F0F0F4"));
+            Put(r,"SurfaceAltBrush",Solid(dark?"#343A37":"#EAEFEB"));
             Put(r,"TextPrimaryBrush",Solid(dark?"#F5F5F7":"#25252A"));
-            Put(r,"TextSecondaryBrush",Solid(dark?"#B4B4BC":"#72727B"));
+            Put(r,"TextSecondaryBrush",Solid(dark?"#B7BFBA":"#5F6862"));
             Put(r,"BorderBrush",Solid(dark?"#47474C":"#DEDEE4"));
-            Put(r,"AccentBrush",Solid(dark?"#0A84FF":"#007AFF"));
-            Put(r,"AccentSoftBrush",Solid(dark?"#193A58":"#E5F0FF"));
-            Put(r,"AccentForegroundBrush",Solid("#FFFFFF"));
-            Put(r,"NavSelectedTextBrush",Solid(dark?"#0A84FF":"#007AFF"));
+            Put(r,"AccentBrush",Solid(dark?"#A7CDBA":"#356859"));
+            Put(r,"AccentSoftBrush",Solid(dark?"#303B35":"#E1E8E2"));
+            Put(r,"AccentForegroundBrush",Solid(dark?"#18372B":"#FFFFFF"));
+            Put(r,"NavSelectedTextBrush",Solid(dark?"#F0F5F2":"#253F31"));
             Put(r,"SelectedTextBrush",Solid(dark?"#F5F5F7":"#25252A"));
-            Put(r,"HoverBrush",Solid(dark?"#414147":"#E8E8EE"));
+            Put(r,"HoverBrush",Solid(dark?"#343C38":"#E5EAE6"));
             Put(r,"SuccessBrush",Solid(dark?"#30D158":"#248A3D"));
-            Put(r,"WarningBrush",Solid(dark?"#FFD60A":"#B36A00"));
+            Put(r,"WarningBrush",Solid(dark?"#EDD392":"#855C14"));
             Put(r,"DangerBrush",Solid(dark?"#FF6961":"#D93025"));
+            Put(r,"DisabledTextBrush",Solid(dark?"#838F87":"#79837C"));
+            Put(r,"ButtonOverlayBrush",Solid(dark?"#FFFFFF":"#000000"));
         }
         public void Dispose() {
             if(disposed)return;

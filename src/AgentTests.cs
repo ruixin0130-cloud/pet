@@ -111,32 +111,80 @@ namespace Tamago {
             bubbleUntil=0;interaction.Clear();engine.SetAutomatic(true);engine.SetAction(PetAction.Idle,false);
             checks.Add("PASS Agent Ready V1 snapshot, dispatcher, commands and priority rules");
         }
+        Button PermissionButton(string taskId,bool approve) {
+            AgentMessageCard card;
+            return workspaceCards.TryGetValue("task:"+taskId,out card)?approve?card.AllowButton:card.RejectButton:null;
+        }
+        void ClickPermission(string taskId,bool approve) {
+            Button button=PermissionButton(taskId,approve);
+            if(button==null||!button.IsEnabled)throw new Exception("Missing enabled permission card action");
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        }
+        void OpenMemoryForTest() {Find<Button>("NavMemory").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));WaitForMemoryUi();}
         void TestDurableTaskUi(List<string> checks,string output) {
             Find<Button>("NavChat").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Expander section=Find<Expander>("DurablePanel");section.IsExpanded=true;
+            Find<Button>("NavTasks").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
             durableFile.Text="ui-approved.txt";durableText.Text="UI durable permission test";
             durableCreate.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
-            if(durableSelection==null||durableSelection.Status!=AgentTaskStatus.WaitingForApproval||!durableApprove.IsEnabled||
-                !durableReject.IsEnabled||System.IO.File.Exists(System.IO.Path.Combine(durableHost.FileDirectory,"ui-approved.txt")))
+            if(durableSelection==null||durableSelection.Status!=AgentTaskStatus.WaitingForApproval||!PermissionButton(durableSelection.TaskId,true).IsEnabled||
+                !PermissionButton(durableSelection.TaskId,false).IsEnabled||System.IO.File.Exists(System.IO.Path.Combine(durableHost.FileDirectory,"ui-approved.txt")))
                 throw new Exception("Durable UI did not suspend the file operation for permission");
             agentHistoryScroll.ScrollToTop();panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"durable-permission-waiting.png"));
-            durableApprove.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            ClickPermission(durableSelection.TaskId,true);
             WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
-            if(durableSelection.Status!=AgentTaskStatus.Succeeded||durableApprove.IsEnabled||
+            if(durableSelection.Status!=AgentTaskStatus.Succeeded||PermissionButton(durableSelection.TaskId,true)!=null||
                 System.IO.File.ReadAllText(System.IO.Path.Combine(durableHost.FileDirectory,"ui-approved.txt"))!="UI durable permission test")
                 throw new Exception("Durable UI approval did not persist the actual file result");
             panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"durable-permission-succeeded.png"));
-            durableFile.Text="ui-rejected.txt";
+            Find<Button>("NavTasks").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));WaitForMemoryUi();durableFile.Text="ui-rejected.txt";
             durableCreate.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
-            durableReject.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            ClickPermission(durableSelection.TaskId,false);
             WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
             if(durableSelection.Status!=AgentTaskStatus.Failed||System.IO.File.Exists(System.IO.Path.Combine(durableHost.FileDirectory,"ui-rejected.txt")))
                 throw new Exception("Durable UI rejection caused a file effect");
             checks.Add("PASS Durable Task V2 UI displays bound permission, approves/persists a real file, rejects without executing (isolated Fake host)");
-            section.IsExpanded=false;
+            workspace.OpenDrawer(null);
+        }
+        void WaitForMemoryUi() {
+            WaitForAgent(durablePending.ContinueWith(delegate(Task complete) {complete.GetAwaiter().GetResult();return true;}));
+        }
+        void TestMemoryUi(List<string> checks,string output) {
+            OpenMemoryForTest();
+            if(memorySaveDialogue.IsChecked==true||memoryEntries.Items.Count!=0)throw new Exception("Memory UI must start empty with conversation persistence off");
+            memoryText.Text="我周五不安排会议";memoryRemember.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));WaitForMemoryUi();
+            if(memoryEntries.Items.Count!=0||memoryPendingSelection==null||!PermissionButton(memoryPendingSelection.TaskId,true).IsEnabled||!memoryApproval.Text.Contains("我周五不安排会议"))
+                throw new Exception("Memory UI must display frozen content before saving");
+            agentHistoryScroll.ScrollToTop();panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"memory-permission-waiting.png"));
+            ClickPermission(memoryPendingSelection.TaskId,true);WaitForMemoryUi();
+            if(memorySelection==null||memorySelection.Content!="我周五不安排会议"||memorySelection.Confirmation!=MemoryConfirmation.UserConfirmed||memoryPendingTasks.Items.Count!=0)
+                throw new Exception("Memory UI approval did not save the confirmed fact");
+            OpenMemoryForTest();memoryQuery.Text="周五会议";memoryAsk.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));WaitForMemoryUi();
+            if(!memoryQueryReply.Text.Contains("1 条")||!memoryConversationStatus.Text.Contains("0 条"))throw new Exception("Memory UI Fake retrieval or default retention failed");
+            panel.UpdateLayout();Capture(panel,System.IO.Path.Combine(output,"memory-confirmed.png"));
+            memoryText.Text="我周五下午不安排会议";memoryUpdate.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));WaitForMemoryUi();
+            if(memorySelection.Revision!=1||!memoryApproval.Text.Contains("我周五下午不安排会议"))throw new Exception("Memory UI correction applied before confirmation");
+            ClickPermission(memoryPendingSelection.TaskId,true);WaitForMemoryUi();OpenMemoryForTest();
+            if(memorySelection.Revision!=2||memorySelection.Content!="我周五下午不安排会议"||memoryQueryReply.Text!="")throw new Exception("Memory UI correction or stale reply removal failed");
+            memoryScope.SelectedIndex=1;WaitForMemoryUi();
+            if(memoryEntries.Items.Count!=0)throw new Exception("Memory UI scope leaked a personal fact into work");
+            memoryScope.SelectedIndex=0;WaitForMemoryUi();
+            memorySaveDialogue.IsChecked=true;memoryAsk.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));WaitForMemoryUi();
+            if(!memoryConversationStatus.Text.Contains("2 条"))throw new Exception("Memory UI opt-in dialogue was not persisted");
+            memoryClearDialogue.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));WaitForMemoryUi();
+            if(!memoryConversationStatus.Text.Contains("0 条")||memoryEntries.Items.Count!=1)throw new Exception("Memory UI dialogue clear affected long-term memory");
+            memoryForget.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));WaitForMemoryUi();
+            if(memoryEntries.Items.Count!=1||!memoryApproval.Text.Contains("忘记"))throw new Exception("Memory UI deletion applied before confirmation");
+            ClickPermission(memoryPendingSelection.TaskId,true);WaitForMemoryUi();OpenMemoryForTest();
+            memorySaveDialogue.IsChecked=false;memoryAsk.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));WaitForMemoryUi();
+            if(memoryEntries.Items.Count!=0||!memoryQueryReply.Text.Contains("0 条"))throw new Exception("Memory UI deleted fact remained in the model context");
+            memoryText.Text="被拒绝的测试偏好";memoryRemember.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));WaitForMemoryUi();
+            ClickPermission(memoryPendingSelection.TaskId,false);WaitForMemoryUi();
+            if(memoryEntries.Items.Count!=0||memoryPendingTasks.Items.Count!=0)throw new Exception("Memory UI rejection wrote a fact");
+            checks.Add("PASS Memory V1 UI remember/view/correct/forget, bound approve/reject, scoped Fake retrieval and opt-in dialogue clear (isolated store)");
+            workspace.OpenDrawer(null);
         }
         void TestAgentChatUi(List<string> checks,string output) {
             if(agentInput==null||agentSend==null||agentCancel==null||agentStatus==null||agentHistory==null||agentToolTrace==null)
@@ -151,7 +199,7 @@ namespace Tamago {
             AgentRunResult result=WaitForAgent(agentPending);
             if(result==null||result.Code!=AgentRunCode.Completed||result.ToolTrace.Count!=1||
                 result.ToolTrace[0].Code!=AgentToolCode.Applied||engine.Action!=PetAction.Sit||
-                !agentTranscript.Contains("玉子已经坐好了。")||!agentTranscript.Contains("你：请坐下")||agentInput.Text!=""||!agentSend.IsEnabled||agentCancel.IsEnabled)
+                !agentTranscript.Contains("玉子已经坐好了。")||!agentTranscript.Contains("你：请坐下")||agentInput.Text!=""||agentSend.IsEnabled||agentCancel.IsEnabled)
                 throw new Exception("Agent 面板未显示真实的动作执行结果");
             panelTheme.ApplyForTesting(false,false);panel.UpdateLayout();
             Capture(panel,System.IO.Path.Combine(output,"agent-success-panel.png"));

@@ -1,15 +1,18 @@
+param([string]$BuildDirectory)
 $ErrorActionPreference = 'Stop'
 & (Join-Path $PSScriptRoot 'test-core.ps1')
-& (Join-Path $PSScriptRoot 'build.ps1') -SkipDistribution
-$petExe = Join-Path $PSScriptRoot 'bin/Tamago.exe'
+& (Join-Path $PSScriptRoot 'build.ps1') -SkipDistribution -OutputDirectory $BuildDirectory
+$petBinDirectory=if($BuildDirectory) {[IO.Path]::GetFullPath($BuildDirectory)} else {Join-Path $PSScriptRoot 'bin'}
+$petExe = Join-Path $petBinDirectory 'Tamago.exe'
+$petLogDirectory=Join-Path (Split-Path $petBinDirectory -Parent) 'output'
 $petTest = Start-Process -FilePath $petExe -ArgumentList '--self-test' -WindowStyle Hidden -PassThru
 if (-not $petTest.WaitForExit(30000)) { Stop-Process -Id $petTest.Id; throw 'Engine tests timed out.' }
-if ($petTest.ExitCode -ne 0) { throw 'Engine tests failed. See output/engine-tests.txt.' }
+if ($petTest.ExitCode -ne 0) { throw "Engine tests failed. See $petLogDirectory/engine-tests.txt." }
 $petSmoke = Start-Process -FilePath $petExe -ArgumentList '--smoke-test' -WindowStyle Hidden -PassThru
 if (-not $petSmoke.WaitForExit(30000)) { Stop-Process -Id $petSmoke.Id; throw 'UI smoke test timed out.' }
-if ($petSmoke.ExitCode -ne 0) { throw 'UI smoke test failed. See output/smoke-test.txt or bin/smoke-error.txt.' }
-Get-Content -LiteralPath (Join-Path $PSScriptRoot 'output/engine-tests.txt') -Tail 1
-Get-Content -LiteralPath (Join-Path $PSScriptRoot 'output/smoke-test.txt')
+if ($petSmoke.ExitCode -ne 0) { throw "UI smoke test failed. See $petLogDirectory/smoke-test.txt or $petBinDirectory/smoke-error.txt." }
+Get-Content -LiteralPath (Join-Path $petLogDirectory 'engine-tests.txt') -Tail 1
+Get-Content -LiteralPath (Join-Path $petLogDirectory 'smoke-test.txt')
 
 # Run an identical executable in an isolated directory, changing only active-pet.json.
 # Never edit the user's selection or the source packages during regression tests.

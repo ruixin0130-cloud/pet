@@ -17,18 +17,23 @@ using Forms=System.Windows.Forms;
 
 [assembly: AssemblyVersion("0.12.0.0")]
 [assembly: AssemblyFileVersion("0.12.0.0")]
+[assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8")]
 
 namespace Tamago {
     static class Program {
         [STAThread] static int Main(string[] args) {
+            // Opt in before any WPF HWND is created, including test/preview entry points.
+            AppContext.SetSwitch("Switch.System.Windows.DoNotScaleForDpiChanges",false);
+            AppContext.SetSwitch("Switch.System.Windows.DoNotUsePresentationDpiCapabilityTier2OrGreater",false);
             bool test=Array.IndexOf(args,"--self-test")>=0;
             bool smoke=Array.IndexOf(args,"--smoke-test")>=0;
+            bool uiPreview=Array.IndexOf(args,"--ui-preview")>=0;
             bool qwenSmoke=Array.IndexOf(args,"--qwen-agent-smoke")>=0;
             if(test) return Tests.Run();
             bool first;
             using(Mutex instance=new Mutex(true,"Local.Tamago.DesktopPet.v01",out first)) {
-                if(!first&&!smoke&&!qwenSmoke) { Native.PostMessage(new IntPtr(0xffff),Native.ShowMessage,IntPtr.Zero,IntPtr.Zero); return 0; }
-                try { return new PetApp(smoke||qwenSmoke,qwenSmoke).Run(); }
+                if(!first&&!smoke&&!qwenSmoke&&!uiPreview) { Native.PostMessage(new IntPtr(0xffff),Native.ShowMessage,IntPtr.Zero,IntPtr.Zero); return 0; }
+                try { return new PetApp(smoke||qwenSmoke||uiPreview,qwenSmoke,uiPreview).Run(); }
                 catch(Exception e) {
                     if(qwenSmoke) {
                         string output=Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"..","output"));
@@ -52,6 +57,7 @@ namespace Tamago {
     public sealed partial class PetApp : Application {
         readonly bool smoke;
         readonly bool qwenSmoke;
+        readonly bool uiPreview;
         readonly PetEngine engine=new PetEngine();
         PetLifeState life=new PetLifeState();
         StudyState study=new StudyState();
@@ -105,8 +111,8 @@ namespace Tamago {
         string lastSettings;
         string SettingsFile { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"TamagoPet","settings.xml"); } }
         PetProfile profile=PetProfile.Current;
-        public PetApp(bool isSmoke,bool isQwenSmoke=false) {
-            smoke=isSmoke;qwenSmoke=isQwenSmoke;ShutdownMode=ShutdownMode.OnExplicitShutdown;
+        public PetApp(bool isSmoke,bool isQwenSmoke=false,bool isUiPreview=false) {
+            smoke=isSmoke;qwenSmoke=isQwenSmoke;uiPreview=isUiPreview;ShutdownMode=ShutdownMode.OnExplicitShutdown;
         }
         protected override void OnStartup(StartupEventArgs e) {
             base.OnStartup(e);
@@ -150,6 +156,7 @@ namespace Tamago {
             timer.Interval=TimeSpan.FromMilliseconds(33); timer.Tick+=Tick;
             previousTime=clock.Elapsed.TotalSeconds; timer.Start();
             if(qwenSmoke)Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,new Action(QwenAgentSmoke));
+            else if(uiPreview)Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,new Action(StartUiPreview));
             else if(smoke)Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,new Action(SmokeTest));
         }
         async void QwenAgentSmoke() {
@@ -198,7 +205,7 @@ namespace Tamago {
         }
         static void SetButtonLabel(Button button,string label) {
             StackPanel content=button.Content as StackPanel;
-            if(content!=null&&content.Children.Count>0) { TextBlock text=content.Children[content.Children.Count-1] as TextBlock; if(text!=null){text.Text=label;text.TextWrapping=TextWrapping.Wrap;text.TextAlignment=TextAlignment.Center;text.FontSize=11;} }
+            if(content!=null&&content.Children.Count>0) { TextBlock text=content.Children[content.Children.Count-1] as TextBlock; if(text!=null){text.Text=label;text.TextWrapping=TextWrapping.Wrap;text.TextAlignment=TextAlignment.Center;text.SetResourceReference(TextBlock.FontSizeProperty,"TypeCaption");} }
             button.ToolTip=label;
         }
         void CreatePanel() {
@@ -211,10 +218,9 @@ namespace Tamago {
             panel.Height=Math.Min(panel.Height,Math.Max(panel.MinHeight,work.Height-24));
             panelTheme=new PanelTheme(panel);
             panel.SizeChanged+=delegate {
-                bool compact=panel.ActualHeight<560;
-                Find<Grid>("PreviewStage").Height=compact?102:172;
-                previewImage.Width=previewImage.Height=compact?100:164;
-                panelSubtitle.Visibility=compact?Visibility.Collapsed:Visibility.Visible;
+                Find<Grid>("PreviewStage").Height=52;
+                previewImage.Width=previewImage.Height=44;
+                panelSubtitle.Visibility=Visibility.Collapsed;
             };
             panelTitle=Find<TextBlock>("PanelTitle");panelSubtitle=Find<TextBlock>("PanelSubtitle");
             panel.Title=profile.CharacterName+" · Agent 工作台";
@@ -254,7 +260,7 @@ namespace Tamago {
             Find<Button>("PanelZoom").Click+=delegate {
                 panel.WindowState=panel.WindowState==WindowState.Maximized?WindowState.Normal:WindowState.Maximized;
             };
-            Find<Button>("NavChat").Click+=delegate { SelectPanelPage("Chat"); };
+            Find<Button>("NavChat").Click+=delegate { SelectPanelPage("Chat");workspace.OpenDrawer(null); };
             Find<Button>("NavActions").Click+=delegate { SelectPanelPage("Actions"); };
             Find<Button>("NavPreferences").Click+=delegate { SelectPanelPage("Preferences"); };
             SelectPanelPage("Chat");
@@ -274,7 +280,7 @@ namespace Tamago {
                 if(!quitting){args.Cancel=true; panel.Hide(); Save();}
             };
             panel.KeyDown+=delegate(object sender,KeyEventArgs args) {
-                if(args.Key==Key.Escape){panel.Hide();args.Handled=true;}
+                if(args.Key==Key.Escape){if(workspace.Drawer!=null)workspace.OpenDrawer(null);else panel.Hide();args.Handled=true;}
             };
             panel.SourceInitialized+=delegate {
                 HwndSource source=HwndSource.FromHwnd(new WindowInteropHelper(panel).Handle);
@@ -716,6 +722,9 @@ namespace Tamago {
                 TestAgentPort(checks);
                 TestAgentChatUi(checks,output);
                 TestDurableTaskUi(checks,output);
+                TestMemoryUi(checks,output);
+                TestConversationWorkspace(checks,output);
+                TestUiQuality(checks,output);
                 CaptureInteractionSheet(Path.Combine(output,"interaction-preview.png"));
                 CaptureInteractionAnimationSheet(Path.Combine(output,"interaction-animation-preview.png"));
                 TestGazeUi(checks);
@@ -944,7 +953,8 @@ namespace Tamago {
             using(FileStream stream=File.Create(path))encoder.Save(stream);
         }
         static void Capture(FrameworkElement element,string path) {
-            RenderTargetBitmap bitmap=new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth),(int)Math.Ceiling(element.ActualHeight),96,96,PixelFormats.Pbgra32);
+            DpiScale dpi=VisualTreeHelper.GetDpi(element);
+            RenderTargetBitmap bitmap=new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth*dpi.DpiScaleX),(int)Math.Ceiling(element.ActualHeight*dpi.DpiScaleY),dpi.PixelsPerInchX,dpi.PixelsPerInchY,PixelFormats.Pbgra32);
             bitmap.Render(element);PngBitmapEncoder encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using(FileStream stream=File.Create(path))encoder.Save(stream);
         }

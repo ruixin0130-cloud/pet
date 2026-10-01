@@ -12,16 +12,20 @@ $coreDll = Join-Path $coreOutput 'Tamago.Core.dll'
 $coreExe = Join-Path $coreOutput 'Tamago.Core.Tests.exe'
 $coreSources = @(
     'AgentCoreContracts.cs', 'AgentCoreRuntime.cs', 'AgentTools.cs', 'AgentTasks.cs', 'AgentExtensions.cs',
-    'AgentDurableContracts.cs', 'AgentDurableService.cs', 'AgentFileWriteTool.cs'
+    'AgentDurableContracts.cs', 'AgentDurableService.cs', 'AgentFileWriteTool.cs',
+    'AgentMemoryContracts.cs', 'AgentMemoryTools.cs', 'AgentMemoryService.cs'
 ) | ForEach-Object { Join-Path $coreProject "src/Core/$_" }
-$coreSources += @('JsonAgentTaskStore.cs','LocalAgentFileWriter.cs') | ForEach-Object { Join-Path $coreProject "src/Persistence/$_" }
+$coreSources += @('JsonAgentTaskStore.cs','JsonAgentMemoryStore.cs','LocalAgentFileWriter.cs') | ForEach-Object { Join-Path $coreProject "src/Persistence/$_" }
 # Intentionally no WPF, PetEngine, PetPort, legacy adapter, HTTP or asset references.
 & $coreCompiler /nologo /target:library /optimize+ /utf8output /codepage:65001 "/out:$coreDll" /reference:System.Web.Extensions.dll @coreSources
 if ($LASTEXITCODE -ne 0) { throw 'Core library build failed.' }
-& $coreCompiler /nologo /target:exe /optimize+ /utf8output /codepage:65001 "/out:$coreExe" "/reference:$coreDll" "/reference:System.Web.Extensions.dll" (Join-Path $coreProject 'tests/Core/AgentCoreTests.cs') (Join-Path $coreProject 'tests/Core/AgentDurableTests.cs') (Join-Path $coreProject 'tests/Core/Program.cs')
+& $coreCompiler /nologo /target:exe /optimize+ /utf8output /codepage:65001 "/out:$coreExe" "/reference:$coreDll" "/reference:System.Web.Extensions.dll" (Join-Path $coreProject 'tests/Core/AgentCoreTests.cs') (Join-Path $coreProject 'tests/Core/AgentDurableTests.cs') (Join-Path $coreProject 'tests/Core/AgentMemoryTests.cs') (Join-Path $coreProject 'tests/Core/Program.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Core tests build failed.' }
 $coreLog = Join-Path $coreProject 'output/core-tests.txt'
-$coreRun = Start-Process -FilePath $coreExe -ArgumentList ('"'+$coreLog+'"') -WindowStyle Hidden -PassThru
+# Keep filesystem integration data in a fresh OS temporary directory, away from the source checkout.
+$coreData = Join-Path ([IO.Path]::GetTempPath()) ('TamagoCoreTests-'+[Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $coreData | Out-Null
+$coreRun = Start-Process -FilePath $coreExe -ArgumentList ('"'+$coreLog+'" "'+$coreData+'"') -WindowStyle Hidden -PassThru
 if (-not $coreRun.WaitForExit(30000)) { Stop-Process -Id $coreRun.Id; throw 'Core tests timed out.' }
 if ($coreRun.ExitCode -ne 0) { throw "Core tests failed ($($coreRun.ExitCode)). See output/core-tests.txt." }
 Get-Content -LiteralPath $coreLog -Tail 1
