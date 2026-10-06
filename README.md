@@ -54,6 +54,8 @@ Windows Agent 已抽出不依赖 WPF、桌宠和模型厂商的 `src/Core/`。`A
 
 单独验证 Core：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-core.ps1`。它只编译 Core DLL 和控制台测试，不引用 WPF、桌宠代码、资源或 Qwen，结果在 `output/core-tests.txt`。完整 Windows 回归仍运行 `test.ps1`，已包含 Core 测试。当前编译器仍是 .NET Framework；Mac Swift 实现未迁移到这套 Core。接口、迁移方式和限制见 [Core Foundation V1 架构](docs/core-foundation-v1.md)。
 
+Core 测试进程默认限时 120 秒，可用 `test-core.ps1 -TimeoutSeconds 180` 调整（1–300 秒）。日志逐项刷新，并记录各组开始、结束和耗时；失败或超时时脚本输出末尾进度，GitHub Actions 会保留已有日志，便于区分测试失败、执行缓慢和卡住。
+
 ## Windows 面板：Agent 工作台
 
 Windows 面板默认打开“对话工作台”，左侧可切换“动作与互动”和“设置”。聊天记录按请求、真实工具结果、最终回复的顺序显示；处理中的请求可取消，已经执行的动作不会撤销。最近 6 轮只保留在本次运行中，清空按钮同时清除界面和后续请求的上下文。学习计时仍从桌宠右键菜单进入。

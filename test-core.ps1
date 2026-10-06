@@ -1,3 +1,4 @@
+param([ValidateRange(1,300)][int]$TimeoutSeconds = 120)
 $ErrorActionPreference = 'Stop'
 $coreProject = $PSScriptRoot
 $coreFramework = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319'
@@ -26,6 +27,13 @@ $coreLog = Join-Path $coreProject 'output/core-tests.txt'
 $coreData = Join-Path ([IO.Path]::GetTempPath()) ('TamagoCoreTests-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $coreData | Out-Null
 $coreRun = Start-Process -FilePath $coreExe -ArgumentList ('"'+$coreLog+'" "'+$coreData+'"') -WindowStyle Hidden -PassThru
-if (-not $coreRun.WaitForExit(30000)) { Stop-Process -Id $coreRun.Id; throw 'Core tests timed out.' }
-if ($coreRun.ExitCode -ne 0) { throw "Core tests failed ($($coreRun.ExitCode)). See output/core-tests.txt." }
+if (-not $coreRun.WaitForExit($TimeoutSeconds * 1000)) {
+    Stop-Process -Id $coreRun.Id
+    if (Test-Path -LiteralPath $coreLog) { Get-Content -LiteralPath $coreLog -Tail 12 | Write-Host }
+    throw "Core tests timed out after $TimeoutSeconds seconds. See output/core-tests.txt for completed checks and the current suite."
+}
+if ($coreRun.ExitCode -ne 0) {
+    if (Test-Path -LiteralPath $coreLog) { Get-Content -LiteralPath $coreLog -Tail 12 | Write-Host }
+    throw "Core tests failed ($($coreRun.ExitCode)). See output/core-tests.txt."
+}
 Get-Content -LiteralPath $coreLog -Tail 1
