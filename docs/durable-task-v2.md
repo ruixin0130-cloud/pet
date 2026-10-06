@@ -1,6 +1,8 @@
 # V2 — Durable Task + Permission V1
 
-本文记录 V2 阶段基线；V3 复用此事务文件并将 schema 升为 3，迁移和 Memory 边界见 [Memory V1](memory-v1.md)。
+本文记录 V2 阶段基线；V3 增加 Memory，[Scheduler V1](scheduler-v1.md) 加入计划和触发审计，当前 [审计归档 V1](audit-archive-v1.md) 将事务库升为 schema 5，合法 2/3/4 可原子迁移。任务与具体操作批准的边界保持不变，Memory 边界见 [Memory V1](memory-v1.md)。
+
+当前 [整组备份与校验恢复 V1](data-backup-v1.md) 在保持 schema 5 的情况下扩展本地存储布局。逻辑根和文件工具目录不变，首次明确恢复后由 `active-store.json` 选择新的主库及配对归档；旧批准失效，未知结果仍需人工核对，实际副作用不回滚。以下路径和验证数量记录 V2 阶段基线。
 
 ## 仓库审计与实现边界
 

@@ -10,46 +10,61 @@ using System.Web.Script.Serialization;
 
 namespace Tamago {
     // The only adapter that accesses durable task files. A lifetime lease excludes a second host.
-    public sealed partial class JsonAgentTaskStore : IAgentDurableTaskStore,IMemoryStore,IConversationStore {
+    public sealed partial class JsonAgentTaskStore : IAgentDurableTaskStore,IMemoryStore,IConversationStore,IAgentScheduleStore,IAgentAuditArchiveStore {
+        public const int CurrentVersion=5;
         public sealed class Document {
             public int Version { get; set; }
             public List<AgentDurableTask> Tasks { get; set; }
             public List<MemoryRecord> Memories {get;set;}
             public List<ConversationRecord> Conversations {get;set;}
+            public List<AgentSchedule> Schedules {get;set;}
+            public List<AgentScheduleTrigger> Triggers {get;set;}
+            public List<AgentAuditArchiveReceipt> Archives {get;set;}
+            public int TriggerSequence {get;set;}
         }
         readonly string path;
+        readonly string logicalRoot;
         readonly FileStream lease;
         readonly SemaphoreSlim gate=new SemaphoreSlim(1,1);
         Document document;
         bool disposed;
         bool writeFaulted;
         readonly Func<DateTimeOffset> utcNow;
-        public string StorageIdentity {get {return Path.GetFullPath(path).ToUpperInvariant();} }
+        public string StorageIdentity {get {return Path.Combine(logicalRoot,"tasks.v2.json").ToUpperInvariant();} }
         [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
         static extern bool MoveFileEx(string source,string destination,int flags);
         static JavaScriptSerializer Serializer() {return new JavaScriptSerializer {MaxJsonLength=8*1024*1024,RecursionLimit=32};}
         public JsonAgentTaskStore(string directory,Func<DateTimeOffset> clock=null) {
             utcNow=clock??delegate {return DateTimeOffset.UtcNow;};
-            directory=Path.GetFullPath(directory);Directory.CreateDirectory(directory);
-            path=Path.Combine(directory,"tasks.v2.json");
-            lease=new FileStream(Path.Combine(directory,"writer.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);
+            logicalRoot=Path.GetFullPath(directory);lease=AgentStorageLayout.Lease(logicalRoot);
             try {
+                path=Path.Combine(AgentStorageLayout.Resolve(logicalRoot),"tasks.v2.json");
                 if(File.Exists(path)) {
                     if(new FileInfo(path).Length>8*1024*1024)throw new InvalidDataException("Task store exceeds the supported size.");
                     document=Serializer().Deserialize<Document>(File.ReadAllText(path,Encoding.UTF8));Validate(document);
-                    if(document.Version==2) {
+                    if(document.Version<CurrentVersion) {
                         // Add empty, separate collections; never infer memories from old tasks.
-                        Document migrated=new Document {Version=3,Tasks=document.Tasks,Memories=new List<MemoryRecord>(),Conversations=new List<ConversationRecord>()};
+                        Document migrated=new Document {Version=CurrentVersion,Tasks=document.Tasks,
+                            Memories=document.Memories??new List<MemoryRecord>(),Conversations=document.Conversations??new List<ConversationRecord>(),
+                            Schedules=document.Schedules??new List<AgentSchedule>(),Triggers=document.Triggers??new List<AgentScheduleTrigger>(),
+                            Archives=new List<AgentAuditArchiveReceipt>(),TriggerSequence=0};
+                        foreach(AgentScheduleTrigger trigger in migrated.Triggers)migrated.TriggerSequence=Math.Max(migrated.TriggerSequence,trigger.Sequence);
                         SaveDocumentAsync(migrated).GetAwaiter().GetResult();
                     }
+                    ValidateArchiveFiles();
                     Document retained=NextDocument();
                     if(PruneConversations(retained))SaveDocumentAsync(retained).GetAwaiter().GetResult();
-                } else document=new Document {Version=3,Tasks=new List<AgentDurableTask>(),Memories=new List<MemoryRecord>(),Conversations=new List<ConversationRecord>()};
+                } else document=new Document {Version=CurrentVersion,Tasks=new List<AgentDurableTask>(),Memories=new List<MemoryRecord>(),Conversations=new List<ConversationRecord>(),
+                    Schedules=new List<AgentSchedule>(),Triggers=new List<AgentScheduleTrigger>(),Archives=new List<AgentAuditArchiveReceipt>()};
                 // Uncommitted temporary files are never promoted on recovery.
             } catch {lease.Dispose();throw;}
         }
         static void Validate(Document value) {
-            if(value==null||(value.Version!=2&&value.Version!=3)||value.Tasks==null||value.Tasks.Count>256)throw new InvalidDataException("Unsupported or invalid task store.");
+            if(value==null||value.Version<2||value.Version>CurrentVersion||value.Tasks==null||value.Tasks.Count>256)throw new InvalidDataException("Unsupported or invalid task store.");
+            if(value.Version<5) {if(value.Archives!=null||value.TriggerSequence!=0)throw new InvalidDataException("Invalid legacy archive collections.");}
+            else ValidateArchiveCollections(value);
+            if(value.Version<4) {if(value.Schedules!=null||value.Triggers!=null)throw new InvalidDataException("Invalid legacy schedule collections.");}
+            else ValidateScheduleCollections(value);
             if(value.Version==2) {
                 if(value.Memories!=null||value.Conversations!=null)throw new InvalidDataException("Invalid version 2 collections.");
             } else ValidateMemoryCollections(value);
@@ -115,7 +130,7 @@ namespace Tamago {
                 CheckOpen();AgentDurableTask proposed=Copy(task);
                 AgentDurableTask previous=document.Tasks.Find(delegate(AgentDurableTask item) {return item.TaskId==proposed.TaskId;});
                 if(previous==null) {
-                    if(proposed.Revision!=1||proposed.Status!=AgentTaskStatus.Created||document.Tasks.Count>=256)
+                    if(RetiredTask(proposed.TaskId)||proposed.Revision!=1||proposed.Status!=AgentTaskStatus.Created||document.Tasks.Count>=256)
                         throw new InvalidOperationException("New task must start at Created; store capacity is 256.");
                 } else if(proposed.Revision!=previous.Revision+1||proposed.RunId!=previous.RunId||!Transition(previous.Status,proposed.Status))
                     throw new InvalidOperationException("Stale revision or invalid task transition.");
@@ -126,8 +141,10 @@ namespace Tamago {
             finally {gate.Release();}
         }
         Document NextDocument() {
-            return new Document {Version=3,Tasks=new List<AgentDurableTask>(document.Tasks),
-                Memories=new List<MemoryRecord>(document.Memories),Conversations=new List<ConversationRecord>(document.Conversations)};
+            return new Document {Version=CurrentVersion,Tasks=new List<AgentDurableTask>(document.Tasks),
+                Memories=new List<MemoryRecord>(document.Memories),Conversations=new List<ConversationRecord>(document.Conversations),
+                Schedules=new List<AgentSchedule>(document.Schedules),Triggers=new List<AgentScheduleTrigger>(document.Triggers),
+                Archives=new List<AgentAuditArchiveReceipt>(document.Archives),TriggerSequence=document.TriggerSequence};
         }
         async Task SaveDocumentAsync(Document next) {
             Validate(next);byte[] bytes=new UTF8Encoding(false).GetBytes(Serializer().Serialize(next));

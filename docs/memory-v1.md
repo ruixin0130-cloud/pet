@@ -1,5 +1,9 @@
 # Memory V1 — V3
 
+本文记录 Memory V1 语义与 V3 阶段基线。[Scheduler V1](scheduler-v1.md) 加入独立计划记录，当前 [审计归档 V1](audit-archive-v1.md) 将共享事务库升级为 schema 5，支持由合法 2/3/4 原子迁移，Memory/Conversation 的授权、保留与删除边界不变。归档不会复制 Memory 或对话正文。
+
+[整组备份与校验恢复 V1](data-backup-v1.md) 提供独立的人工校验恢复入口。首次恢复后主库由同一逻辑根下的 `active-store.json` 选择，schema 仍为 5。忘记记忆或清除对话不擦除历史快照及保留的旧数据；明确恢复旧快照可能带回已删除内容，需用户核对和确认。普通 Memory 删除与后续检索语义保持不变。
+
 ## 基线与边界
 
 开始时工作区干净，分支 `codex/windows-macos-ui-v1`，基线 `63c423c`。复用 V1 的无 WPF Core、Provider/工具/权限注入与 V2 的本地原子事务、操作绑定审批、执行检查点及保守恢复。原 `IAgentMemory` 是未接入的简单占位接口，缺少来源、确认、范围与版本，因此增加独立的强类型存储端口，没有重写既有 Runtime 或桌宠工具。

@@ -71,7 +71,7 @@ namespace Tamago {
             Find<Button>("NavChat").Tag=!open?"Selected":null;
         }
         void RefreshWorkspaceBusy() {
-            if(!workspaceInitialized)return;bool busy=durableBusy||agentRunning,changed=workspace.IsBusy!=busy;
+            if(!workspaceInitialized)return;bool busy=durableBusy||agentRunning||dataDetached,changed=workspace.IsBusy!=busy;
             workspace.SetBusy(busy);Find<Button>("NavNewChat").IsEnabled=!busy;
             agentInput.IsEnabled=agentClear.IsEnabled=!busy;agentSend.IsEnabled=!busy&&!String.IsNullOrWhiteSpace(agentInput.Text);
             agentCancel.IsEnabled=agentRunning;agentCancel.Visibility=agentRunning?Visibility.Visible:Visibility.Collapsed;
@@ -139,6 +139,9 @@ namespace Tamago {
                     if(approve)await durableHost.Memory.ExecuteApprovedAsync(message.TaskId,message.PermissionId,message.BindingHash,CancellationToken.None);
                     memoryQueryReply.Text="";await RefreshMemoryAsync(null);
                 } else {
+                    if(message.AlreadyApproved&&!approve) {
+                        if(!await durableHost.Scheduler.CancelTaskAsync(message.TaskId))await durableHost.Service.CancelAsync(message.TaskId);
+                    }
                     if(!message.AlreadyApproved)await durableHost.Service.DecideAsync(message.TaskId,message.PermissionId,message.BindingHash,approve);
                     if(approve)await durableHost.Service.ExecuteApprovedAsync(message.TaskId,message.PermissionId,message.BindingHash,CancellationToken.None);
                 }

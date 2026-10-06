@@ -31,19 +31,25 @@ namespace Tamago {
             durableTasks.SelectionChanged+=delegate {RenderDurableSelection();};
             durableCancel.Click+=delegate {durablePending=DurableActionAsync(async delegate {
                 if(durableSelection==null)return;string id=durableSelection.TaskId;
-                await durableHost.Service.CancelAsync(id);durableStatus.Text="任务已取消。";await RefreshDurableTasksAsync(id);
+                if(!await durableHost.Scheduler.CancelTaskAsync(id))await durableHost.Service.CancelAsync(id);
+                durableStatus.Text="已请求取消；已提交的操作以实际结果为准。";await RefreshDurableTasksAsync(id);
             });};
             durableSuccess.Click+=delegate {durablePending=DurableReconcileAsync(true);};
             durableFailure.Click+=delegate {durablePending=DurableReconcileAsync(false);};
             Find<Expander>("DurablePanel").Expanded+=delegate {durablePending=DurableActionAsync(delegate {return RefreshDurableTasksAsync(null);});};
+            InitializeSchedulerPanel();
+            InitializeAuditArchivePanel();
+            InitializeDataBackupPanel();
         }
         async Task DurableActionAsync(Func<Task> action) {
-            if(durableBusy||agentRunning)return;durableBusy=true;SetDurableButtons();
+            if(durableBusy||agentRunning)return;
+            if(dataDetached) {durableStatus.Text="数据连接已释放。请在备份与恢复面板重新连接后操作。";return;}
+            durableBusy=true;SetDurableButtons();
             bool refreshAfterFailure=false;
             try {
               try {
                 if(durableHost==null) {
-                    AgentDurableHost opened=await AgentDurableHost.OpenAsync(smoke);
+                    AgentDurableHost opened=await DataBackupHost().OpenAgentAsync();
                     if(quitting){opened.Dispose();return;}durableHost=opened;
                 }
                 await action();
@@ -95,16 +101,18 @@ namespace Tamago {
         }
         void SetDurableButtons() {
             if(durableCreate==null)return;
-            durableCreate.IsEnabled=durableRefresh.IsEnabled=!durableBusy&&!agentRunning;
+            durableCreate.IsEnabled=durableRefresh.IsEnabled=!durableBusy&&!agentRunning&&!dataDetached;
             AgentPermissionRecord p=SelectedPermission();
-            bool waiting=!durableBusy&&durableSelection!=null&&durableSelection.Status==AgentTaskStatus.WaitingForApproval&&p!=null;
-            bool review=!durableBusy&&durableSelection!=null&&(durableSelection.Status==AgentTaskStatus.NeedsReview||durableSelection.Status==AgentTaskStatus.Interrupted);
+            bool waiting=!durableBusy&&!dataDetached&&durableSelection!=null&&durableSelection.Status==AgentTaskStatus.WaitingForApproval&&p!=null;
+            bool review=!durableBusy&&!dataDetached&&durableSelection!=null&&(durableSelection.Status==AgentTaskStatus.NeedsReview||durableSelection.Status==AgentTaskStatus.Interrupted);
             durableSuccess.IsEnabled=durableFailure.IsEnabled=review;
-            durableCancel.IsEnabled=!durableBusy&&durableSelection!=null&&(waiting||durableSelection.Status==AgentTaskStatus.Created||
+            durableCancel.IsEnabled=!durableBusy&&!dataDetached&&durableSelection!=null&&(waiting||durableSelection.Status==AgentTaskStatus.Created||
                 durableSelection.Status==AgentTaskStatus.Queued||durableSelection.Status==AgentTaskStatus.Interrupted);
             durableCancel.Visibility=durableCancel.IsEnabled?Visibility.Visible:Visibility.Collapsed;
             durableSuccess.Visibility=durableFailure.Visibility=review?Visibility.Visible:Visibility.Collapsed;
             SetMemoryButtons();
+            SetAuditArchiveButtons();
+            SetDataBackupButtons();
         }
         Task DurableReconcileAsync(bool succeeded) {
             return DurableActionAsync(async delegate {

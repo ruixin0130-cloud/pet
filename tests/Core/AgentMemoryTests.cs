@@ -320,10 +320,10 @@ namespace Tamago.CoreTests {
                     new AgentFileWriteTool(new LocalAgentFileWriter(Path.Combine(root,"migration-files")))}),new AgentScopePermissionPolicy(new [] {"files"}));
                 pending=Await(durable.RunAsync(new AgentCoreRequest("{\"fileName\":\"migration.txt\",\"text\":\"synthetic migration\"}"),None));
             }
-            string legacy=File.ReadAllText(path).Replace("\"Version\":3","\"Version\":2").Replace(",\"Memories\":[],\"Conversations\":[]","");File.WriteAllText(path,legacy);
+            string legacy=Program.AsLegacyDocument(File.ReadAllText(path),2);File.WriteAllText(path,legacy);
             using(JsonAgentTaskStore store=new JsonAgentTaskStore(directory)) {
                 AgentDurableTask task=Await(store.GetAsync(pending.TaskId));
-                check(File.ReadAllText(path).Contains("\"Version\":3")&&task.Status==AgentTaskStatus.WaitingForApproval&&
+                check(File.ReadAllText(path).Contains("\"Version\":"+JsonAgentTaskStore.CurrentVersion)&&task.Status==AgentTaskStatus.WaitingForApproval&&
                     task.Permissions[0].BindingHash==pending.Approval.BindingHash&&Await(store.ListMemoriesAsync(None)).Count==0&&Await(store.ReadConversationsAsync(None)).Count==0,
                     "V3 migration preserves V2 task/approval identity and adds empty separate collections without inferring facts");
                 AgentDurableService durable=new AgentDurableService(store,new AgentFileWriteFakeProvider(),new AgentToolRegistry(new IAgentTool[] {

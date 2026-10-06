@@ -18,17 +18,20 @@ namespace Tamago {
         readonly IAgentTaskCheckpoint checkpoint;
         string taskId,runId;
         readonly TimeSpan modelBudget,portTimeout,snapshotTimeout;
+        readonly Func<TimeSpan> executionRemaining;
         int active;
 
         public AgentCoreRuntime(IAgentCoreModelAdapter modelAdapter,AgentToolRegistry tools=null,
             IAgentPermissionPolicy permissionPolicy=null,IAgentContextSource stateSource=null,IAgentTaskStore tasks=null,
-            TimeSpan? modelTimeBudget=null,TimeSpan? toolCallTimeout=null,TimeSpan? stateReadTimeout=null,IAgentTaskCheckpoint durableCheckpoint=null) {
+            TimeSpan? modelTimeBudget=null,TimeSpan? toolCallTimeout=null,TimeSpan? stateReadTimeout=null,IAgentTaskCheckpoint durableCheckpoint=null,
+            Func<TimeSpan> remainingExecutionBudget=null) {
             if(modelAdapter==null)throw new ArgumentNullException("modelAdapter");
             model=modelAdapter;registry=tools??new AgentToolRegistry();permissions=permissionPolicy??new AgentScopePermissionPolicy();
             contextSource=stateSource;taskStore=tasks??new InMemoryAgentTaskStore();checkpoint=durableCheckpoint;
             modelBudget=modelTimeBudget??TimeSpan.FromSeconds(30);
             portTimeout=toolCallTimeout??TimeSpan.FromSeconds(5);
             snapshotTimeout=stateReadTimeout??TimeSpan.FromSeconds(5);
+            executionRemaining=remainingExecutionBudget;
             if(modelBudget<=TimeSpan.Zero||portTimeout<=TimeSpan.Zero||snapshotTimeout<=TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException("All time budgets must be positive.");
         }
@@ -76,10 +79,16 @@ namespace Tamago {
         }
         async Task<AgentToolOutcome> DispatchAsync(IAgentTool handler,AgentToolCall call) {
             Task<AgentToolOutcome> pending;
+            TimeSpan wait=portTimeout;
+            if(executionRemaining!=null) {
+                TimeSpan remaining=executionRemaining();
+                if(remaining<=TimeSpan.Zero)return new AgentToolOutcome(AgentToolCode.ExecutionUnknown);
+                if(remaining<wait)wait=remaining;
+            }
             // Once submitted, cancellation cannot erase an effect. Record its outcome or uncertainty, never retry.
             try { pending=handler.ExecuteAsync(call,CancellationToken.None);if(pending==null)return new AgentToolOutcome(AgentToolCode.ExecutionUnknown); }
             catch(Exception) { return new AgentToolOutcome(AgentToolCode.ExecutionUnknown); }
-            Task winner=await Task.WhenAny(pending,Task.Delay(portTimeout)).ConfigureAwait(false);
+            Task winner=await Task.WhenAny(pending,Task.Delay(wait)).ConfigureAwait(false);
             if(winner!=pending){ObserveLateFailure(pending);return new AgentToolOutcome(AgentToolCode.ExecutionUnknown);}
             try { return await pending.ConfigureAwait(false)??new AgentToolOutcome(AgentToolCode.ExecutionUnknown); }
             catch(Exception) { return new AgentToolOutcome(AgentToolCode.ExecutionUnknown); }
@@ -219,7 +228,7 @@ namespace Tamago {
                         "此操作需要人工确认，尚未执行。",snapshot,trace,turns,approval);
                 }
                 if(code==AgentToolCode.Applied) {
-                    if(cancellationToken.IsCancellationRequested)
+                    if(cancellationToken.IsCancellationRequested||(executionRemaining!=null&&executionRemaining()<=TimeSpan.Zero))
                         return Finish(AgentRunCode.Cancelled,"请求已取消；已执行的操作见记录。",snapshot,trace,turns);
                     if(!await SaveAsync(AgentTaskStatus.Running,null,turns,trace,null,call).ConfigureAwait(false))
                         return Finish(AgentRunCode.StateUnavailable,"任务状态保存失败，此次工具尚未执行；已执行的操作见记录。",snapshot,trace,turns);

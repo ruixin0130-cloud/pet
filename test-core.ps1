@@ -13,13 +13,13 @@ $coreExe = Join-Path $coreOutput 'Tamago.Core.Tests.exe'
 $coreSources = @(
     'AgentCoreContracts.cs', 'AgentCoreRuntime.cs', 'AgentTools.cs', 'AgentTasks.cs', 'AgentExtensions.cs',
     'AgentDurableContracts.cs', 'AgentDurableService.cs', 'AgentFileWriteTool.cs',
-    'AgentMemoryContracts.cs', 'AgentMemoryTools.cs', 'AgentMemoryService.cs'
+    'AgentMemoryContracts.cs', 'AgentMemoryTools.cs', 'AgentMemoryService.cs', 'AgentScheduleContracts.cs','AgentSchedulerService.cs','AgentAuditArchiveContracts.cs','AgentDataBackupContracts.cs'
 ) | ForEach-Object { Join-Path $coreProject "src/Core/$_" }
-$coreSources += @('JsonAgentTaskStore.cs','JsonAgentMemoryStore.cs','LocalAgentFileWriter.cs') | ForEach-Object { Join-Path $coreProject "src/Persistence/$_" }
+$coreSources += @('JsonAgentTaskStore.cs','JsonAgentMemoryStore.cs','JsonAgentScheduleStore.cs','JsonAgentAuditArchiveStore.cs','AgentStorageLayout.cs','LocalAgentDataBackupStore.cs','LocalAgentFileWriter.cs') | ForEach-Object { Join-Path $coreProject "src/Persistence/$_" }
 # Intentionally no WPF, PetEngine, PetPort, legacy adapter, HTTP or asset references.
 & $coreCompiler /nologo /target:library /optimize+ /utf8output /codepage:65001 "/out:$coreDll" /reference:System.Web.Extensions.dll @coreSources
 if ($LASTEXITCODE -ne 0) { throw 'Core library build failed.' }
-& $coreCompiler /nologo /target:exe /optimize+ /utf8output /codepage:65001 "/out:$coreExe" "/reference:$coreDll" "/reference:System.Web.Extensions.dll" (Join-Path $coreProject 'tests/Core/AgentCoreTests.cs') (Join-Path $coreProject 'tests/Core/AgentDurableTests.cs') (Join-Path $coreProject 'tests/Core/AgentMemoryTests.cs') (Join-Path $coreProject 'tests/Core/Program.cs')
+& $coreCompiler /nologo /target:exe /optimize+ /utf8output /codepage:65001 "/out:$coreExe" "/reference:$coreDll" "/reference:System.Web.Extensions.dll" (Join-Path $coreProject 'tests/Core/AgentCoreTests.cs') (Join-Path $coreProject 'tests/Core/AgentDurableTests.cs') (Join-Path $coreProject 'tests/Core/AgentMemoryTests.cs') (Join-Path $coreProject 'tests/Core/AgentSchedulerTests.cs') (Join-Path $coreProject 'tests/Core/AgentAuditArchiveTests.cs') (Join-Path $coreProject 'tests/Core/AgentDataBackupTests.cs') (Join-Path $coreProject 'tests/Core/Program.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Core tests build failed.' }
 $coreLog = Join-Path $coreProject 'output/core-tests.txt'
 # Keep filesystem integration data in a fresh OS temporary directory, away from the source checkout.

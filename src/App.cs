@@ -659,6 +659,7 @@ namespace Tamago {
         }
         void Quit() {
             if(quitting)return;quitting=true;Save();
+            if(schedulerRefresh!=null)schedulerRefresh.Stop();
             DisposeAgentChat();
             if(panelTheme!=null)panelTheme.Dispose();
             if(timer!=null)timer.Stop();
@@ -725,6 +726,9 @@ namespace Tamago {
                 TestMemoryUi(checks,output);
                 TestConversationWorkspace(checks,output);
                 TestUiQuality(checks,output);
+                TestSchedulerUi(checks,output);
+                TestAuditArchiveUi(checks,output);
+                TestDataBackupUi(checks,output);
                 CaptureInteractionSheet(Path.Combine(output,"interaction-preview.png"));
                 CaptureInteractionAnimationSheet(Path.Combine(output,"interaction-animation-preview.png"));
                 TestGazeUi(checks);

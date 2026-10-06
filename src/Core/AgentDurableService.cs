@@ -13,6 +13,7 @@ namespace Tamago {
         readonly SemaphoreSlim gate=new SemaphoreSlim(1,1);
         readonly TimeSpan toolTimeout;
         bool recovered;
+        public IAgentExecutionLimiter ExecutionLimiter {get;internal set;}
         public AgentDurableService(IAgentDurableTaskStore store,IAgentModelProvider provider,AgentToolRegistry registry,
             IAgentPermissionPolicy policy,TimeSpan? toolTimeout=null) {
             if(store==null||provider==null||registry==null||policy==null)throw new ArgumentNullException();
@@ -182,10 +183,20 @@ namespace Tamago {
         }
         async Task<AgentCoreResult> Execute(AgentDurableTask task,AgentCoreRequest request,IAgentCoreModelAdapter adapter,
             AgentPermissionRecord approved,CancellationToken token) {
-            Session session=new Session(this,task,approved!=null);
-            AgentCoreRuntime runtime=new AgentCoreRuntime(adapter,registry,new DurablePolicy(policy,approved),null,null,
-                null,toolTimeout,null,session);
-            return await runtime.RunWithIdentityAsync(request,token,task.TaskId,task.RunId).ConfigureAwait(false);
+            AgentExecutionLease lease=ExecutionLimiter==null?null:await ExecutionLimiter.EnterAsync(task.TaskId,token).ConfigureAwait(false);
+            AgentCoreResult result=null;Exception failure=null;
+            try {
+                Session session=new Session(this,task,approved!=null);
+                TimeSpan? budget=lease==null?(TimeSpan?)null:TimeSpan.FromMilliseconds(Math.Max(1,lease.Remaining.TotalMilliseconds));
+                AgentCoreRuntime runtime=new AgentCoreRuntime(adapter,registry,new DurablePolicy(policy,approved),null,null,
+                    budget,toolTimeout,null,session,lease==null?(Func<TimeSpan>)null:delegate {return lease.Remaining;});
+                result=await runtime.RunWithIdentityAsync(request,lease==null?token:lease.Token,task.TaskId,task.RunId).ConfigureAwait(false);
+            }catch(Exception error){failure=error;}
+            if(lease!=null) {
+                try {await lease.CompleteAsync().ConfigureAwait(false);}finally {lease.Dispose();}
+            }
+            if(failure!=null)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+            return result;
         }
         sealed class ApprovedOperationModel : IAgentCoreModelAdapter {
             readonly AgentToolCall call;int turns;

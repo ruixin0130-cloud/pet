@@ -113,7 +113,7 @@ namespace Tamago {
             SetMemoryButtons();
         }
         void SetMemoryButtons() {
-            if(memoryRemember==null)return;bool enabled=!durableBusy&&!agentRunning;
+            if(memoryRemember==null)return;bool enabled=!durableBusy&&!agentRunning&&!dataDetached;
             memoryRemember.IsEnabled=memoryView.IsEnabled=memoryAsk.IsEnabled=memoryClearDialogue.IsEnabled=memoryScope.IsEnabled=enabled;
             memoryUpdate.IsEnabled=memoryForget.IsEnabled=enabled&&memorySelection!=null;
             RefreshWorkspaceBusy();

@@ -137,14 +137,15 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Grid VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <Border x:Name="CheckBoxSquare" Width="16" Height="16" CornerRadius="4" BorderThickness="1"
                                     BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource SurfaceBrush}">
                                 <Path x:Name="CheckBoxMark" Data="M 3,8 L 6.5,11.5 L 13,4" Stroke="{DynamicResource AccentForegroundBrush}"
                                       StrokeThickness="2" Visibility="Collapsed" />
                             </Border>
-                            <ContentPresenter ContentSource="Content" RecognizesAccessKey="True" VerticalAlignment="Center" Margin="8,0,0,0" />
-                        </StackPanel>
+                            <ContentPresenter Grid.Column="1" ContentSource="Content" RecognizesAccessKey="True" VerticalAlignment="Center" Margin="8,0,0,0" />
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True"><Setter TargetName="CheckBoxSquare" Property="Background" Value="{DynamicResource AccentBrush}" /><Setter TargetName="CheckBoxSquare" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter TargetName="CheckBoxMark" Property="Visibility" Value="Visible" /></Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="CheckBoxSquare" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter TargetName="CheckBoxSquare" Property="BorderThickness" Value="2" /></Trigger>
@@ -354,7 +355,48 @@
                                             </WrapPanel>
                                             <TextBlock x:Name="DurableStatus" Text="等待人工操作；不自动执行或重放。" FontSize="{StaticResource TypeCaption}" TextWrapping="Wrap" />
                                         </StackPanel>
-                                    </Expander></StackPanel></ScrollViewer>
+                                    </Expander><Expander x:Name="SchedulerPanel" Header="本地计划任务" IsExpanded="False" Margin="0,8,0,10"><StackPanel Margin="4,8,4,4">
+<TextBlock Text="显式创建文件计划。每次到期仍需确认；错过超过 60 秒会跳过，不补跑。关闭面板不停止宿主，退出程序会停止。" TextWrapping="Wrap" Style="{StaticResource Caption}" />
+<TextBox x:Name="ScheduleTitle" Text="文本文件计划" MaxLength="64" Margin="0,8,0,4" ToolTip="计划名称" />
+<TextBox x:Name="ScheduleTime" Margin="0,0,0,4" ToolTip="首次当地时间：yyyy-MM-ddTHH:mm，2000–2099；每周按此日期的星期重复" />
+<ComboBox x:Name="ScheduleZone" Margin="0,0,0,4" ToolTip="计划时区（Windows 时区）" />
+<ComboBox x:Name="ScheduleRule" SelectedIndex="0" Margin="0,0,0,8"><ComboBoxItem Content="仅一次" /><ComboBoxItem Content="每天 · 同一当地时间" /><ComboBoxItem Content="每周 · 同一星期和当地时间" /></ComboBox>
+<TextBlock Text="使用上方文件名作为前缀、上方文本作为内容。每次运行会生成独立文件名；预算 30 秒、最多并发 1。" TextWrapping="Wrap" Style="{StaticResource Caption}" />
+<Button x:Name="ScheduleCreate" Content="保存计划" HorizontalAlignment="Left" Margin="0,6,0,10" />
+<TextBlock x:Name="SchedulerStatus" Text="本地调度：已停止 · 需要手动启动" TextWrapping="Wrap" Style="{StaticResource Caption}" />
+<WrapPanel Margin="0,6,0,8"><Button x:Name="SchedulerStart" Content="启动宿主" Margin="0,0,5,4" /><Button x:Name="SchedulerPause" Content="暂停分发" Margin="0,0,5,4" IsEnabled="False" /><Button x:Name="SchedulerResume" Content="恢复分发" Margin="0,0,5,4" IsEnabled="False" /><Button x:Name="SchedulerStop" Content="停止宿主" Margin="0,0,5,4" IsEnabled="False" /></WrapPanel>
+<ComboBox x:Name="Schedules" ToolTip="已保存的计划" />
+<WrapPanel Margin="0,6,0,8"><Button x:Name="SchedulePause" Content="暂停计划" Margin="0,0,5,4" /><Button x:Name="ScheduleResume" Content="恢复计划" Margin="0,0,5,4" /><Button x:Name="ScheduleCancel" Content="取消计划" Margin="0,0,5,4" /></WrapPanel>
+<TextBlock Text="运行记录 · 确认卡片在对话中" Style="{StaticResource Caption}" /><ComboBox x:Name="ScheduleRuns" Margin="0,6,0,4" />
+<WrapPanel><Button x:Name="ScheduleRunPause" Content="暂停本次" Margin="0,0,5,4" ToolTip="只在排队或等待确认时暂停，已提交操作不能挂起" /><Button x:Name="ScheduleRunResume" Content="恢复本次" Margin="0,0,5,4" /><Button x:Name="ScheduleRunCancel" Content="取消本次" Margin="0,0,5,4" /></WrapPanel>
+</StackPanel></Expander>
+<Expander x:Name="AuditPanel" Header="历史记录归档" IsExpanded="False" Margin="0,8,0,10">
+    <StackPanel Margin="4,8,4,4">
+        <TextBlock Text="仅归档已结束且结果明确的记录，保留待确认与需核对任务。先停止调度宿主，再预览并确认。归档只读，不会删除文件、记忆或对话。" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+        <Button x:Name="AuditPreview" Content="预览可归档记录" HorizontalAlignment="Left" Margin="0,8,0,8" />
+        <TextBlock x:Name="AuditSummary" Text="先预览，再决定是否归档。" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+        <Button x:Name="AuditConfirm" Content="确认归档" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" IsEnabled="False" Margin="0,8,0,12" />
+        <TextBlock x:Name="AuditListStatus" Text="尚未加载归档" Style="{StaticResource Caption}" Margin="0,0,0,6" />
+        <ComboBox x:Name="AuditArchives" ToolTip="已保存的只读归档" />
+        <Button x:Name="AuditRead" Content="查看所选归档" Style="{StaticResource QuietButton}" HorizontalAlignment="Left" IsEnabled="False" Margin="0,6,0,6" />
+        <TextBlock x:Name="AuditDetail" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+    </StackPanel>
+</Expander>
+<Expander x:Name="DataBackupPanel" Header="数据备份与恢复" IsExpanded="False" Margin="0,8,0,10">
+    <StackPanel Margin="4,8,4,4">
+        <TextBlock Text="整组备份包含长期记忆、已保存对话和审计记录，不包含实际生成的文件。先停止调度，再释放存储连接。备份独立保留，忘记记忆不会删除历史副本。" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+        <WrapPanel Margin="0,8,0,8"><Button x:Name="DataRelease" Content="释放存储" Margin="0,0,6,4" /><Button x:Name="DataReconnect" Content="重新连接" Margin="0,0,6,4" /></WrapPanel>
+        <TextBlock x:Name="DataBackupStatus" Text="按需创建本机备份；恢复前必须校验并确认。" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+        <WrapPanel Margin="0,8,0,8"><Button x:Name="DataBackupCreate" Content="创建整组备份" Margin="0,0,6,4" /><Button x:Name="DataBackupRefresh" Content="刷新备份" Margin="0,0,6,4" /></WrapPanel>
+        <TextBlock x:Name="DataBackupCount" Style="{StaticResource Caption}" Margin="0,0,0,6" TextWrapping="Wrap" />
+        <ComboBox x:Name="DataBackups" ToolTip="本机保存的整组备份" />
+        <Button x:Name="DataRestorePreview" Content="校验并预览恢复" HorizontalAlignment="Left" IsEnabled="False" Margin="0,8,0,8" />
+        <TextBlock x:Name="DataRestoreSummary" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+        <CheckBox x:Name="DataRestoreConsent" Margin="0,8,0,8"><TextBlock Text="我确认替换当前记忆与对话，并已停止旧执行。实际文件不会回滚。" TextWrapping="Wrap" /></CheckBox>
+        <Button x:Name="DataRestoreConfirm" Content="确认恢复所选快照" Style="{StaticResource DangerButton}" HorizontalAlignment="Left" IsEnabled="False" />
+        <Expander Header="备份位置" IsExpanded="False" Margin="0,8,0,0"><TextBlock x:Name="DataBackupLocation" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0" /></Expander>
+    </StackPanel>
+</Expander></StackPanel></ScrollViewer>
                 <ScrollViewer Style="{DynamicResource WorkspaceScrollViewer}" x:Name="PermissionsDrawerPane" VerticalScrollBarVisibility="Auto" Visibility="Collapsed"><StackPanel><TextBlock Text="允许只适用于卡片中的这一次操作。拒绝后不会执行。" FontSize="{StaticResource TypeCaption}" TextWrapping="Wrap" Margin="0,0,0,12" /><StackPanel x:Name="PermissionCardsHost" /></StackPanel></ScrollViewer>
                 <ScrollViewer Style="{DynamicResource WorkspaceScrollViewer}" x:Name="HistoryDrawerPane" VerticalScrollBarVisibility="Auto" Visibility="Collapsed"><StackPanel><TextBlock Text="本次会话保留最近 6 轮。下方只展示你曾选择保存的对话；不会自动加入当前模型上下文。" FontSize="{StaticResource TypeCaption}" TextWrapping="Wrap" Margin="0,0,0,12" /><StackPanel x:Name="SavedHistoryHost" /></StackPanel></ScrollViewer>
                 <ScrollViewer Style="{DynamicResource WorkspaceScrollViewer}" x:Name="DebugDrawerPane" VerticalScrollBarVisibility="Auto" Visibility="Collapsed"><StackPanel><TextBlock Text="连接与高级信息" FontSize="{StaticResource TypeBody}" FontWeight="SemiBold" Margin="0,0,0,8" /><TextBlock x:Name="PackStatus" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,0,0,8" /><TextBlock x:Name="DragHint" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,0,0,12" /><Border x:Name="PreviewBubble" Visibility="Collapsed" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="{StaticResource RadiusSmall}" Padding="8" Margin="0,0,0,12"><TextBlock x:Name="PreviewSpeech" Style="{StaticResource Caption}" TextWrapping="Wrap" /></Border><TextBlock x:Name="ProviderDetail" TextWrapping="Wrap" FontSize="{StaticResource TypeCaption}" /><TextBlock Text="本地文件与记忆操作使用现有 Fake Provider 验证流程；不会新增网络连接。" TextWrapping="Wrap" FontSize="{StaticResource TypeCaption}" Margin="0,12,0,12" /><Expander Header="最近一次工具详情" IsExpanded="False"><TextBlock x:Name="AgentToolTrace" Text="尚无工具记录。" FontSize="{StaticResource TypeCaption}" TextWrapping="Wrap" Margin="0,8,0,0" /></Expander><Button x:Name="AgentClear" Content="清空当前对话" HorizontalAlignment="Left" Margin="0,16,0,0" /></StackPanel></ScrollViewer>
